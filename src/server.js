@@ -1,0 +1,205 @@
+const osc = require('osc');
+const path = require('path');
+const express = require('express');
+const WebSocket = require('ws');
+const MidiClock = require('midi-clock')
+const watch = require('node-watch');
+const isEmpty = require('lodash/isEmpty');
+const fs = require('fs');
+const exampleTemplate = require('./example.html');
+
+let clock;
+let clockIsRunning = false;
+let fileChangesHashMap = {};
+
+// TODO: avoid loading the entire file into memory
+const BROWSER_SCRIPT = fs.readFileSync(path.join(__dirname, 'browser.js')).toString();
+const OSC_BROWSER_SCRIPT = fs.readFileSync(path.join(__dirname, '..', 'node_modules/osc/dist/osc-browser.js')).toString();
+
+const getIPAddresses = () => {
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    const ipAddresses = [];
+
+    for (let deviceName in interfaces) {
+        const addresses = interfaces[deviceName];
+        for (let i = 0; i < addresses.length; i++) {
+            const addressInfo = addresses[i];
+            if (addressInfo.family === 'IPv4' && !addressInfo.internal) {
+                ipAddresses.push(addressInfo.address);
+            }
+        }
+    }
+
+    return ipAddresses;
+};
+
+const sendMIDIBeat = async (socket) => {
+    socket.send({
+        address: '/midi/beat',
+    });
+}
+
+const sendMIDITick = async (socket) => {
+    socket.send({
+        address: '/midi/tick',
+    });
+}
+
+const readFileChanges = async (socket) => {
+    if (isEmpty(fileChangesHashMap)) return;
+    const packets = [];
+    for (let f in fileChangesHashMap) {
+        console.log('Detected change in ', f);
+        packets.push({
+            address: `/buffer/${f}`,
+        })
+    }
+    // Clearing map
+    socket.send({
+        timeTag: osc.timeTag(0),
+        packets
+    });
+
+    fileChangesHashMap = {};
+}
+
+const stopClock = (c) => {
+    if (clockIsRunning) {
+        c.stop();
+        clockIsRunning = false;
+    }
+};
+
+const startClock = (c) => {
+    if (!c) {
+        clock = MidiClock();
+        c = clock;
+    }
+    c.start();
+    clockIsRunning = true;
+}
+
+const updateBpm = (c, bpm) => {
+    if (c && clockIsRunning) {
+        c.setTempo(bpm);
+    }
+}
+
+// Create an Express-based Web Socket server to which OSC messages will be relayed.
+function startServer(opts = {}) {
+    const {
+        port = 8081,
+        serverPath,
+        currentDir,
+        buffers
+    } = opts;
+
+    const b = buffers || 'public/_buffers';
+    const SERVER_PATH = path.resolve(serverPath);
+    const BUFFERS_LOCATION = path.join(SERVER_PATH, b);
+    console.log('PATH', SERVER_PATH);
+
+    if (!serverPath) throw new Error('Invalid root path!');
+
+    // Bind to a UDP socket to listen for incoming OSC events.
+    const udpPort = new osc.UDPPort({
+        localAddress: '0.0.0.0',
+        localPort: 57121
+    });
+
+    udpPort.on('ready', () => {
+        var ipAddresses = getIPAddresses();
+        console.log('Listening for OSC over UDP.');
+        ipAddresses.forEach((address) => {
+            console.log(' Host:', address + ', Port:', udpPort.options.localPort);
+        });
+        console.log(`To start the demo, go to http://localhost:${port}/example.html in your web browser.`);
+        console.log(`You can then add/edit JS files with loop definitions in your buffers directory: ${buffers}`);
+    });
+
+    udpPort.open();
+
+    // Create an Express-based Web Socket server to which OSC messages will be relayed.
+    const appResources = serverPath;
+    const nodeModules = currentDir + '/node_modules';
+
+    const app = express();
+    const server = app.listen(port);
+    const wss = new WebSocket.Server({
+            server: server
+        });
+
+    app.use(express.json()); // Support JSON post body
+
+    // static libs
+    app.get('/browser.js', (req, res) => {
+        res.set('Content-Type', 'application/javascript');
+        res.send(BROWSER_SCRIPT);
+    });
+
+    app.get('/osc-browser.js', (req, res) => {
+        res.set('Content-Type', 'application/javascript');
+        res.send(OSC_BROWSER_SCRIPT);
+    });
+
+    // example page
+    app.get('/example.html', (req, res) => {
+        res.send(exampleTemplate(OSC_BROWSER_SCRIPT, BROWSER_SCRIPT));
+    });
+    app.use('/', express.static(appResources));
+    app.use('/node_modules/', express.static(nodeModules));
+    app.post('/startClock', (req, res) => {
+        startClock(clock);
+        res.send('ok!');
+    });
+
+    app.post('/stopClock', (req, res) => {
+        stopClock(clock);
+        res.send('ok!');
+    });
+
+    app.post('/updateBpm', (req, res) => {
+        const { bpm } = req.body || {};
+        updateBpm(clock, bpm);
+        console.log('Tempo updated to: ', bpm);
+        res.send('ok!');
+    });
+
+    wss.on('connection', (socket) => {
+        console.log('A Web Socket connection has been established!');
+        var socketPort = new osc.WebSocketPort({
+            socket: socket
+        });
+
+        var relay = new osc.Relay(udpPort, socketPort, {
+            raw: true
+        });
+        startClock(clock);
+
+        const beatCallback = (position) => {
+            const microPos = position % 24; // 24 ticks per event 
+            sendMIDITick(socketPort).catch((e) => unbindCallback());
+            if (microPos === 0) {
+                console.log('Beat: ', position / 24);
+                // TODO: better handle closing of browser tabs
+                sendMIDIBeat(socketPort).catch((e) => unbindCallback());
+                readFileChanges(socketPort).catch((e) => unbindCallback());
+            }
+        };
+
+        const unbindCallback = () => {
+            clock.removeListener('position', beatCallback);
+        }
+
+        clock.on('position', beatCallback);
+    });
+
+    watch(`${BUFFERS_LOCATION}`, { recursive: false }, (evt, name) => {
+        const bufferName = name.replace(SERVER_PATH, '');
+        console.log('%s changed.', bufferName);
+        fileChangesHashMap[bufferName] = true;
+    });
+}
+
+module.exports = startServer;
