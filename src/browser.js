@@ -113,6 +113,7 @@ function setTempo(bpm) {
 
 const playNote = (n) => {
     oscillator = context.createOscillator();
+    oscillator.type = 'sine';
     oscillator.frequency.value = n;
     oscillator.connect(context.destination);
     oscillator.start(0);

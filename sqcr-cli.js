@@ -13,6 +13,8 @@ const cli = meow(`
         --port, -p      specify port number
         --bpm, -b       initial BPM
         --path, -d      specify root path of server
+        --example, -e  run example: "midi" or "webaudio"
+        --init, -i      init file name
 `, {
     flags: {
         port: {
@@ -30,8 +32,20 @@ const cli = meow(`
         buffers: {
             type: 'string',
             alias: 'bf'
+        },
+        example: {
+            type: 'string',
+            alias: 'e'
+        },
+        init: {
+            type: 'string',
+            alias: 'i'
         }
     }
 });
 
-sqcr(cli.input, cli.flags);
+if (cli.flags.help || cli.flags.h || !cli.input[0]) {
+    cli.showHelp();
+} else {
+    sqcr(cli.input, cli.flags);
+}

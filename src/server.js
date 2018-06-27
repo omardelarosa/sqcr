@@ -24,6 +24,7 @@ let fileChangesHashMap = {};
 // TODO: avoid loading the entire file into memory
 const BROWSER_SCRIPT = fs.readFileSync(path.join(__dirname, 'browser.js')).toString();
 const OSC_BROWSER_SCRIPT = fs.readFileSync(path.join(__dirname, '..', 'node_modules/osc/dist/osc-browser.js')).toString();
+const TONAL_BROWSER_SCRIPT = fs.readFileSync(path.join(__dirname, '..', 'node_modules/tonal/build/transpiled.js'));
 
 const getIPAddresses = () => {
     const os = require('os');
@@ -101,12 +102,14 @@ function startServer(opts = {}) {
         port = 8081,
         serverPath,
         currentDir,
-        buffers
+        buffers,
+        init = 'init.js',
     } = opts;
 
     const b = buffers || 'public/_buffers';
     const SERVER_PATH = path.resolve(serverPath);
     const BUFFERS_LOCATION = path.join(SERVER_PATH, b);
+    const INIT_FILE_NAME = `${b}/${init}`; 
 
     console.log(ASCII_TEXT);
 
@@ -156,11 +159,24 @@ function startServer(opts = {}) {
         res.send(OSC_BROWSER_SCRIPT);
     });
 
+    app.get('/tonal.js', (req, res) => {
+        res.set('Content-Type', 'application/javascript');
+        res.send(TONAL_BROWSER_SCRIPT);
+    });
+
     app.use('/', express.static(appResources));
 
     // fall back to example example page
     app.get('/', (req, res) => {
-        res.send(exampleTemplate(OSC_BROWSER_SCRIPT, BROWSER_SCRIPT));
+        res.send(
+            exampleTemplate(
+                OSC_BROWSER_SCRIPT,
+                BROWSER_SCRIPT,
+                TONAL_BROWSER_SCRIPT,
+                b,
+                INIT_FILE_NAME
+            )
+        );
     });
 
     // Serve node_modules for libs, etc

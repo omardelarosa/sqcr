@@ -1,4 +1,10 @@
-const exampleTemplate = (OSC_BROWSER_SCRIPT, BROWSER_SCRIPT) =>
+const exampleTemplate = (
+    OSC_BROWSER_SCRIPT,
+    BROWSER_SCRIPT,
+    TONAL_BROWSER_SCRIPT,
+    BUFFER_PATH,
+    INIT_FILE_NAME
+    ) =>
     `
     <!DOCTYPE html>
     <html>
@@ -8,6 +14,11 @@ const exampleTemplate = (OSC_BROWSER_SCRIPT, BROWSER_SCRIPT) =>
             <script src="https://cdn.jsdelivr.net/npm/webmidi"></script>
             <script>${OSC_BROWSER_SCRIPT}</script>
             <script>${BROWSER_SCRIPT}</script>
+            <script>${TONAL_BROWSER_SCRIPT}</script>
+            <script>
+                var BUFFER_PATH = '${BUFFER_PATH}';
+            </script>
+            <script async src="${INIT_FILE_NAME}"></script>
         </head>
 
         <body>
