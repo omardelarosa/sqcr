@@ -13,7 +13,6 @@ const cli = meow(`
         --port, -p      specify port number
         --bpm, -b       initial BPM
         --path, -d      specify root path of server
-        --example, -e  run example: "midi" or "webaudio"
         --init, -i      init file name
 `, {
     flags: {
@@ -32,10 +31,6 @@ const cli = meow(`
         buffers: {
             type: 'string',
             alias: 'bf'
-        },
-        example: {
-            type: 'string',
-            alias: 'e'
         },
         init: {
             type: 'string',
