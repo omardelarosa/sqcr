@@ -45,7 +45,9 @@ You can even receive OSC events and respond to them accordingly.
 A few libraries are already included in the browser context:
 
 [OSC.js](https://github.com/colinbdclark/osc.js/) - For interacting with OSC events.
+
 [WebMidi](https://github.com/djipco/webmidi) - For Interacting with MIDI
+
 [Tonal](https://github.com/danigb/tonal) - For music/note transformation tasks
 
 ### Loops
