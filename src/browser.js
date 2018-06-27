@@ -17,13 +17,10 @@ let dispatcher = new Dispatcher();
 
 const handleTick = (ev) => {
     const sequenceId = ev.detail.sequenceId;
-    // console.log('Sequence ID', sequenceId);
     doBeat(sequenceId);
 }
 
 const handleBeat = (ev) => {
-    const sequenceId = ev.detail.sequenceId;
-    console.log('Beat Sequence ID', sequenceId);
     drainRegisterLoopQueue();
 }
 
@@ -141,8 +138,15 @@ const processLoops = (t) => {
     Object.keys(loops).forEach((loopName) => {
         loops[loopName].run();
     });
-    // console.log('process time: ', Date.now() - start);
 } 
+
+const bufferQueue = [];
+
+const processBuffers = () => {
+    while (bufferQueue.length) {
+        loadBuffer(bufferQueue.shift());
+    }
+};
 
 // DATA container
 let data = [];
@@ -171,9 +175,9 @@ function doBeat() {
             // Ahead of time, schedule for later
             setTimeout(() => processLoops(beat), deltaDiff * -1);
         } else {
-            // behind time... TODO:
             processLoops(beat);
         }
+        processBuffers();
         lastBeat = t2;
     }
 }
@@ -192,7 +196,7 @@ const handleMessage = (msg) => {
     if (msgParts[1] === 'buffer') {
         // slow
         console.log('loop change detected');
-        loadBuffer(msgParts.slice(2).join('/'));
+        bufferQueue.push(msgParts.slice(2).join('/'));
     } 
 
     // Message type 2
@@ -200,7 +204,6 @@ const handleMessage = (msg) => {
 
         if (msgParts[2] === 'beat') {
             beatCounter++;
-            // console.log('beat', ++beatCounter);
             const evt = new CustomEvent('beat', { detail: { sequenceId: beatCounter } });
             dispatcher.dispatchEvent(evt);
         }
@@ -208,8 +211,6 @@ const handleMessage = (msg) => {
         if (msgParts[2] === 'tick') {
             const evt = new CustomEvent('tick', { detail: { sequenceId: ++tick } });
             dispatcher.dispatchEvent(evt);
-            // console.log('tick', ++tick);
-            // doBeat(tick);
         }
     }
 }

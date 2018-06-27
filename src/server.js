@@ -7,6 +7,15 @@ const watch = require('node-watch');
 const isEmpty = require('lodash/isEmpty');
 const fs = require('fs');
 const exampleTemplate = require('./example.html');
+const clc = require('cli-color');
+const ASCII_TEXT = require('./ascii').ASCII_TEXT;
+
+const debug = require('debug');
+
+// DEBUGGERS
+const D_BEAT = debug('beat');
+const D_FILE = debug('file');
+const D_SERVER = debug('server');
 
 let clock;
 let clockIsRunning = false;
@@ -50,7 +59,7 @@ const readFileChanges = async (socket) => {
     if (isEmpty(fileChangesHashMap)) return;
     const packets = [];
     for (let f in fileChangesHashMap) {
-        console.log('Detected change in ', f);
+        D_FILE('Detected change in buffer: ', f);
         packets.push({
             address: `/buffer/${f}`,
         })
@@ -98,7 +107,10 @@ function startServer(opts = {}) {
     const b = buffers || 'public/_buffers';
     const SERVER_PATH = path.resolve(serverPath);
     const BUFFERS_LOCATION = path.join(SERVER_PATH, b);
-    console.log('PATH', SERVER_PATH);
+
+    console.log(ASCII_TEXT);
+
+    D_SERVER('Starting server in: ', SERVER_PATH);
 
     if (!serverPath) throw new Error('Invalid root path!');
 
@@ -110,12 +122,13 @@ function startServer(opts = {}) {
 
     udpPort.on('ready', () => {
         var ipAddresses = getIPAddresses();
-        console.log('Listening for OSC over UDP.');
+        const msgParts = [ 'OSC over UDP host: ' ];
         ipAddresses.forEach((address) => {
-            console.log(' Host:', address + ', Port:', udpPort.options.localPort);
+            msgParts.push(clc.cyanBright(address + ':' + udpPort.options.localPort));
         });
-        console.log(`To start the demo, go to http://localhost:${port}/example.html in your web browser.`);
-        console.log(`You can then add/edit JS files with loop definitions in your buffers directory: ${buffers}`);
+        console.log(...msgParts);
+        console.log('browser host: ', clc.cyanBright(`http://localhost:${port}`));
+        console.log('loops path: ', clc.cyanBright(`${buffers}`));
     });
 
     udpPort.open();
@@ -143,31 +156,35 @@ function startServer(opts = {}) {
         res.send(OSC_BROWSER_SCRIPT);
     });
 
-    // example page
-    app.get('/example.html', (req, res) => {
+    app.use('/', express.static(appResources));
+
+    // fall back to example example page
+    app.get('/', (req, res) => {
         res.send(exampleTemplate(OSC_BROWSER_SCRIPT, BROWSER_SCRIPT));
     });
-    app.use('/', express.static(appResources));
+
+    // Serve node_modules for libs, etc
     app.use('/node_modules/', express.static(nodeModules));
+
     app.post('/startClock', (req, res) => {
         startClock(clock);
-        res.send('ok!');
+        res.send({ status: 'success' });
     });
 
     app.post('/stopClock', (req, res) => {
         stopClock(clock);
-        res.send('ok!');
+        res.send({ status: 'success' });
     });
 
     app.post('/updateBpm', (req, res) => {
         const { bpm } = req.body || {};
         updateBpm(clock, bpm);
-        console.log('Tempo updated to: ', bpm);
-        res.send('ok!');
+        D_BEAT('Tempo updated to: %d', bpm);
+        res.send({ status: 'success' });
     });
 
     wss.on('connection', (socket) => {
-        console.log('A Web Socket connection has been established!');
+        D_SERVER('A browser client has connected via WebSockets!');
         var socketPort = new osc.WebSocketPort({
             socket: socket
         });
@@ -181,7 +198,7 @@ function startServer(opts = {}) {
             const microPos = position % 24; // 24 ticks per event 
             sendMIDITick(socketPort).catch((e) => unbindCallback());
             if (microPos === 0) {
-                console.log('Beat: ', position / 24);
+                D_BEAT('Beat: %d', position / 24);
                 // TODO: better handle closing of browser tabs
                 sendMIDIBeat(socketPort).catch((e) => unbindCallback());
                 readFileChanges(socketPort).catch((e) => unbindCallback());
@@ -197,7 +214,7 @@ function startServer(opts = {}) {
 
     watch(`${BUFFERS_LOCATION}`, { recursive: false }, (evt, name) => {
         const bufferName = name.replace(SERVER_PATH, '');
-        console.log('%s changed.', bufferName);
+        D_FILE('%s changed.', bufferName);
         fileChangesHashMap[bufferName] = true;
     });
 }

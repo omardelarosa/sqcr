@@ -6,7 +6,7 @@ const sqcr = require('.');
 
 const cli = meow(`
     Usage: 
-        $ scqr
+        $ scqr <buffers-path>
 
     Options:
         --buffers, -bf  specify location of buffer.js files
