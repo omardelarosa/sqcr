@@ -4,7 +4,8 @@
 const meow = require('meow');
 const sqcr = require('.');
 
-const cli = meow(`
+const cli = meow(
+    `
     Usage: 
         $ scqr <buffers-path>
 
@@ -14,30 +15,37 @@ const cli = meow(`
         --bpm, -b       initial BPM
         --path, -d      specify root path of server
         --init, -i      init file name
-`, {
-    flags: {
-        port: {
-            type: 'number',
-            alias: 'p'
+        --browser, -bc  use browser clock
+`,
+    {
+        flags: {
+            port: {
+                type: 'number',
+                alias: 'p',
+            },
+            bpm: {
+                type: 'number',
+                alias: 'b',
+            },
+            path: {
+                type: 'string',
+                alias: 'd',
+            },
+            buffers: {
+                type: 'string',
+                alias: 'bf',
+            },
+            init: {
+                type: 'string',
+                alias: 'i',
+            },
+            init: {
+                type: 'boolean',
+                alias: 'bc',
+            },
         },
-        bpm: {
-            type: 'number',
-            alias: 'b'
-        },
-        path: {
-            type: 'string',
-            alias: 'd'
-        },
-        buffers: {
-            type: 'string',
-            alias: 'bf'
-        },
-        init: {
-            type: 'string',
-            alias: 'i'
-        }
-    }
-});
+    },
+);
 
 if (cli.flags.help || cli.flags.h || !cli.input[0]) {
     cli.showHelp();

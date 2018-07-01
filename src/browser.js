@@ -15,14 +15,14 @@ function Dispatcher(options) {
 
 let dispatcher = new Dispatcher();
 
-const handleTick = (ev) => {
+const handleTick = ev => {
     const sequenceId = ev.detail.sequenceId;
     doBeat(sequenceId);
-}
+};
 
-const handleBeat = (ev) => {
+const handleBeat = ev => {
     drainRegisterLoopQueue();
-}
+};
 
 dispatcher.addEventListener('tick', handleTick);
 dispatcher.addEventListener('beat', handleBeat);
@@ -48,9 +48,7 @@ class Loop {
     sleep(amount) {
         this.ticksToSleep = amount;
         this.isSleeping = true;
-        return new Promise((resolve, reject) => {
-
-        });
+        return new Promise((resolve, reject) => {});
     }
 
     destroy() {
@@ -62,7 +60,7 @@ class Loop {
         // Decrementer must be at the begging to account for 0th tick in sleep cycle
         this.ticksToSleep--;
         if (this.ticksToSleep <= 0) {
-          this.isSleeping = false;
+            this.isSleeping = false;
         }
 
         // Only call if not sleeping, not dead and has not been called this tick
@@ -96,22 +94,21 @@ function loop(name, handler) {
 
 // TODO: make sleep scoped to each loop
 // TODO: break this out into a primitive operation
-const sleep = (ticks) => new Promise(
-);
+const sleep = ticks => new Promise();
 
 function setTempo(bpm) {
     fetch(`http://${window.location.host}/updateBpm`, {
         method: 'POST',
         headers: {
-            'content-type': 'application/json'
+            'content-type': 'application/json',
         },
-        body: JSON.stringify({ bpm })
-    }).then((res) => {
+        body: JSON.stringify({ bpm }),
+    }).then(res => {
         console.log('BPM updated', res.json());
     });
 }
 
-const playNote = (n) => {
+const playNote = n => {
     oscillator = context.createOscillator();
     oscillator.type = 'sine';
     oscillator.frequency.value = n;
@@ -119,10 +116,10 @@ const playNote = (n) => {
     oscillator.start(0);
     setTimeout(() => {
         oscillator.stop(0);
-    }, 100)
-}
+    }, 100);
+};
 
-const loadBuffer = (b) => {
+const loadBuffer = b => {
     const $buffers = document.querySelectorAll('.buffer-script');
     $buffers.forEach(b => b.remove());
     const $buffer = document.createElement('script');
@@ -131,15 +128,15 @@ const loadBuffer = (b) => {
     $buffer.className = 'buffer-script';
     document.body.appendChild($buffer);
     // Cancel any pending loop invokations
-}
+};
 
-const processLoops = (t) => {
+const processLoops = t => {
     const start = Date.now();
     // Limit duration of this invokation with timeout to preserve time
-    Object.keys(loops).forEach((loopName) => {
+    Object.keys(loops).forEach(loopName => {
         loops[loopName].run();
     });
-} 
+};
 
 const bufferQueue = [];
 
@@ -183,53 +180,55 @@ function doBeat() {
     }
 }
 
-function doTick() {
-    
-}
-
+function doTick() {}
 
 // TODO: create central event dispatcher
 
 // OSC.js stuff
-const handleMessage = (msg) => {
+const handleMessage = msg => {
     // Message type 1
     const msgParts = msg.address.split('/');
     if (msgParts[1] === 'buffer') {
         // slow
         console.log('loop change detected');
         bufferQueue.push(msgParts.slice(2).join('/'));
-    } 
+    }
 
     // Message type 2
     if (msgParts[1] === 'midi') {
-
         if (msgParts[2] === 'beat') {
             beatCounter++;
-            const evt = new CustomEvent('beat', { detail: { sequenceId: beatCounter } });
+            const evt = new CustomEvent('beat', {
+                detail: { sequenceId: beatCounter },
+            });
             dispatcher.dispatchEvent(evt);
         }
 
         if (msgParts[2] === 'tick') {
-            const evt = new CustomEvent('tick', { detail: { sequenceId: ++tick } });
+            const evt = new CustomEvent('tick', {
+                detail: { sequenceId: ++tick },
+            });
             dispatcher.dispatchEvent(evt);
         }
     }
-}
+};
 
 const initOSC = () => {
+    // noop when using browser clock
+    if (USE_BROWSER_CLOCK) return;
+
     // Init container
 
     // Init port
     oscPort = new osc.WebSocketPort({
-        url: `ws://${window.location.host}`
+        url: `ws://${window.location.host}`,
     });
-
 
     // listen
-    oscPort.on('message', (msg) => {
+    oscPort.on('message', msg => {
         handleMessage(msg); // Debugging
     });
-    
+
     // open port
     oscPort.open();
 };
@@ -245,15 +244,13 @@ const getOutputs = () => {
     } else {
         return [];
     }
-}
+};
 
 // MIDI Testing
-WebMidi.enable(function (err) {
-
-  if (err) {
-    console.log("WebMidi could not be enabled.", err);
-  } else {
-    console.log("WebMidi enabled!");
-  }
-  
+WebMidi.enable(function(err) {
+    if (err) {
+        console.log('WebMidi could not be enabled.', err);
+    } else {
+        console.log('WebMidi enabled!');
+    }
 });
