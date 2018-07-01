@@ -2,6 +2,9 @@ var AudioContext = window.AudioContext || window.webkitAudioContext;
 var context = new AudioContext();
 
 let timerWorker = null;
+let __browserBPM = null;
+
+const calcTickInterval = bpm => (60 * 1000) / bpm / 24;
 
 // Custom event dispatcher
 function Dispatcher(options) {
@@ -17,11 +20,13 @@ function Dispatcher(options) {
 
 let dispatcher = new Dispatcher();
 
+// Things to do on the tick
 const handleTick = ev => {
     const sequenceId = ev.detail.sequenceId;
     doBeat(sequenceId);
 };
 
+// Things to do on the beat
 const handleBeat = ev => {
     drainRegisterLoopQueue();
 };
@@ -99,7 +104,13 @@ function loop(name, handler) {
 const sleep = ticks => new Promise();
 
 function setTempo(bpm) {
-    // TODO: make this use the web-worker...
+    if (USE_BROWSER_CLOCK) {
+        __browserBPM = bpm;
+        timerWorker.postMessage({ interval: calcTickInterval(bpm) });
+        return;
+    }
+
+    // If no worker is being used...
     fetch(`http://${window.location.host}/updateBpm`, {
         method: 'POST',
         headers: {
@@ -117,6 +128,7 @@ const playNote = n => {
     oscillator.frequency.value = n;
     oscillator.connect(context.destination);
     oscillator.start(0);
+
     setTimeout(() => {
         oscillator.stop(0);
     }, 100);
@@ -185,6 +197,10 @@ function doBeat() {
 
 function doTick() {}
 
+function scheduledCall(fn, delay) {
+    setTimeout(fn, delay);
+}
+
 // TODO: create central event dispatcher
 
 // OSC.js stuff
@@ -208,10 +224,13 @@ const handleMessage = msg => {
         }
 
         if (msgParts[2] === 'tick') {
-            const evt = new CustomEvent('tick', {
-                detail: { sequenceId: ++tick },
-            });
-            dispatcher.dispatchEvent(evt);
+            dl = calcTickInterval(__browserBPM);
+            scheduledCall(() => {
+                const evt = new CustomEvent('tick', {
+                    detail: { sequenceId: ++tick },
+                });
+                dispatcher.dispatchEvent(evt);
+            }, dl);
         }
     }
 };
@@ -219,7 +238,7 @@ const handleMessage = msg => {
 const initClock = () => {
     // noop when using browser clock
     if (USE_BROWSER_CLOCK) {
-        timerWorker = new Worker('/browser-worker.js');
+        timerWorker = new Worker('/src/browser-worker.js');
         timerWorker.onmessage = e => {
             if (e.data === 'tick') {
                 handleMessage({ address: '/midi/tick' });

@@ -22,16 +22,16 @@ let clockIsRunning = false;
 let fileChangesHashMap = {};
 
 // TODO: avoid loading the entire file into memory
-
 const loadFile = fileparts =>
     fs.readFileSync(path.join(...fileparts)).toString();
 
-const BROWSER_SCRIPT = () => loadFile([__dirname, 'browser.js']);
-const BROWSER_WORKER_SCRIPT = () => loadFile([__dirname, 'browser-worker.js']);
-const OSC_BROWSER_SCRIPT = () =>
-    loadFile([__dirname, '..', 'node_modules/osc/dist/osc-browser.js']);
-const TONAL_BROWSER_SCRIPT = () =>
-    loadFile([__dirname, '..', 'node_modules/tonal/build/transpiled.js']);
+// Libraries -- TODO make this configurable via json file
+const WEB_MIDI_LIB_PATH = '/node_modules/webmidi/webmidi.min.js';
+const BROWSER_WORKER_SCRIPT_PATH = '/src/browser-worker.js';
+const BROWSER_SCRIPT_PATH = '/src/browser.js';
+const OSC_BROWSER_SCRIPT_PATH = '/node_modules/osc/dist/osc-browser.js';
+const TONAL_BROWSER_SCRIPT_PATH = '/node_modules/tonal/build/transpiled.js';
+const TONE_LIB_BROWSER_SCRIPT = '/node_modules/tone/build/Tone.min.js';
 
 const getIPAddresses = () => {
     const os = require('os');
@@ -152,7 +152,7 @@ function startServer(opts = {}) {
 
     // Create an Express-based Web Socket server to which OSC messages will be relayed.
     const appResources = serverPath;
-    const nodeModules = currentDir + '/node_modules';
+    const nodeModules = path.join(__dirname, '..', 'node_modules');
 
     const app = express();
     const server = app.listen(port);
@@ -167,44 +167,30 @@ function startServer(opts = {}) {
     app.use(express.json()); // Support JSON post body
 
     // static libs
-    app.get('/browser.js', (req, res) => {
-        res.set('Content-Type', 'application/javascript');
-        res.send(BROWSER_SCRIPT());
-    });
-
-    app.get('/browser-worker.js', (req, res) => {
-        res.set('Content-Type', 'application/javascript');
-        res.send(BROWSER_WORKER_SCRIPT());
-    });
-
-    app.get('/osc-browser.js', (req, res) => {
-        res.set('Content-Type', 'application/javascript');
-        res.send(OSC_BROWSER_SCRIPT());
-    });
-
-    app.get('/tonal.js', (req, res) => {
-        res.set('Content-Type', 'application/javascript');
-        res.send(TONAL_BROWSER_SCRIPT());
-    });
-
     app.use('/', express.static(appResources));
+    // Serve node_modules for libs, etc
+    app.use('/node_modules/', express.static(nodeModules));
 
     // fall back to example example page
     app.get('/', (req, res) => {
         res.send(
             exampleTemplate(
-                OSC_BROWSER_SCRIPT(),
-                BROWSER_SCRIPT(),
-                TONAL_BROWSER_SCRIPT(),
-                b,
-                INIT_FILE_NAME,
-                USE_BROWSER_CLOCK,
+                {
+                    BUFFER_PATH: b,
+                    USE_BROWSER_CLOCK,
+                    ASCII_TEXT,
+                },
+                [
+                    WEB_MIDI_LIB_PATH,
+                    OSC_BROWSER_SCRIPT_PATH,
+                    TONAL_BROWSER_SCRIPT_PATH,
+                    TONE_LIB_BROWSER_SCRIPT,
+                    BROWSER_SCRIPT_PATH,
+                    INIT_FILE_NAME,
+                ],
             ),
         );
     });
-
-    // Serve node_modules for libs, etc
-    app.use('/node_modules/', express.static(nodeModules));
 
     app.post('/startClock', (req, res) => {
         startClock(clock);
