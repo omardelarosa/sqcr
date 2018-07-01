@@ -4,51 +4,47 @@
 pulse = 0;
 
 loop('pulse', async ctx => {
-    const now = Date.now();
-    if (!ctx.last) ctx.last = now;
-    console.log('TIME_SINCE: ', now - ctx.last);
-    ctx.last = now;
     pulse++;
-    ctx.sleep(T / 4);
+    ctx.sleep(t / 4);
 });
 
 loop('synth', async ctx => {
     let i = pulse % 4;
 
-    SYNTH()
-        .playNote(notes[i], 1, { velocity: 0.3 })
-        .stopNote(notes[i], 1, { time: '+100' });
+    synth()
+        .playnote(notes[i], 1, { velocity: 0.3 })
+        .stopnote(notes[i], 1, { time: '+100' });
 
-    ctx.sleep(T / 4);
+    ctx.sleep(t / 4);
 });
 
 loop('kicks', async ctx => {
-    if (!kicks[pulse % 16]) return ctx.sleep(T / 4);
+    if (!kicks[pulse % 16]) return ctx.sleep(t / 4);
 
-    // Play kick beat
-    TR()
-        .playNote(36, 1, { velocity: 0.9 })
-        .stopNote(36, 1, { time: '+100' });
+    // play kick beat
+    tr()
+        .playnote(36, 1, { velocity: 0.9 })
+        .stopnote(36, 1, { time: '+100' });
 
-    ctx.sleep(T / 4);
+    ctx.sleep(t / 4);
 });
 
 loop('hats', async ctx => {
-    if (!hats[pulse % 16]) return ctx.sleep(T / 4);
+    if (!hats[pulse % 16]) return ctx.sleep(t / 4);
 
-    TR()
-        .playNote(42, 1, { velocity: 0.4 })
-        .stopNote(42, 1, { time: '+100' });
+    tr()
+        .playnote(42, 1, { velocity: 0.4 })
+        .stopnote(42, 1, { time: '+100' });
 
-    ctx.sleep(T / 4);
+    ctx.sleep(t / 4);
 });
 
 loop('snares', async ctx => {
-    if (!snares[pulse % 16]) return ctx.sleep(T / 4);
+    if (!snares[pulse % 16]) return ctx.sleep(t / 4);
 
-    TR()
-        .playNote(38, 1, { velocity: 0.4 })
-        .stopNote(38, 1, { time: '+100' });
+    tr()
+        .playnote(38, 1, { velocity: 0.4 })
+        .stopnote(38, 1, { time: '+100' });
 
-    ctx.sleep(T / 4);
+    ctx.sleep(t / 4);
 });

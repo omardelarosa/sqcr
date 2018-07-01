@@ -224,19 +224,16 @@ const handleMessage = msg => {
         }
 
         if (msgParts[2] === 'tick') {
-            dl = calcTickInterval(__browserBPM);
-            scheduledCall(() => {
-                const evt = new CustomEvent('tick', {
-                    detail: { sequenceId: ++tick },
-                });
-                dispatcher.dispatchEvent(evt);
-            }, dl);
+            const evt = new CustomEvent('tick', {
+                detail: { sequenceId: ++tick },
+            });
+            dispatcher.dispatchEvent(evt);
         }
     }
 };
 
 const initClock = () => {
-    // noop when using browser clock
+    // Use web-worker for client-beat instead of backend worker
     if (USE_BROWSER_CLOCK) {
         timerWorker = new Worker('/src/browser-worker.js');
         timerWorker.onmessage = e => {
@@ -247,7 +244,6 @@ const initClock = () => {
             }
         };
         timerWorker.postMessage('start');
-        return;
     }
 
     // Init container

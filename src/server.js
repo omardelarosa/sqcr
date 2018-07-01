@@ -156,13 +156,9 @@ function startServer(opts = {}) {
 
     const app = express();
     const server = app.listen(port);
-    let wss = null;
-
-    if (USE_BROWSER_CLOCK) {
-        const wss = new WebSocket.Server({
-            server: server,
-        });
-    }
+    const wss = new WebSocket.Server({
+        server: server,
+    });
 
     app.use(express.json()); // Support JSON post body
 
@@ -209,36 +205,39 @@ function startServer(opts = {}) {
         res.send({ status: 'success' });
     });
 
-    if (wss) {
-        wss.on('connection', socket => {
-            D_SERVER('A browser client has connected via WebSockets!');
-            var socketPort = new osc.WebSocketPort({
-                socket: socket,
-            });
-
-            var relay = new osc.Relay(udpPort, socketPort, {
-                raw: true,
-            });
-            startClock(clock);
-
-            const beatCallback = position => {
-                const microPos = position % 24; // 24 ticks per event
-                sendMIDITick(socketPort).catch(e => unbindCallback());
-                if (microPos === 0) {
-                    D_BEAT('Beat: %d', position / 24);
-                    // TODO: better handle closing of browser tabs
-                    sendMIDIBeat(socketPort).catch(e => unbindCallback());
-                    readFileChanges(socketPort).catch(e => unbindCallback());
-                }
-            };
-
-            const unbindCallback = () => {
-                clock.removeListener('position', beatCallback);
-            };
-
-            clock.on('position', beatCallback);
+    wss.on('connection', socket => {
+        D_SERVER('A browser client has connected via WebSockets!');
+        var socketPort = new osc.WebSocketPort({
+            socket: socket,
         });
-    }
+
+        var relay = new osc.Relay(udpPort, socketPort, {
+            raw: true,
+        });
+
+        startClock(clock);
+
+        const beatCallback = position => {
+            const microPos = position % 24; // 24 ticks per event
+            if (!USE_BROWSER_CLOCK) {
+                sendMIDITick(socketPort).catch(e => unbindCallback());
+            }
+            if (microPos === 0) {
+                // TODO: better handle closing of browser tabs
+                if (!USE_BROWSER_CLOCK) {
+                    D_BEAT('Beat: %d', position / 24);
+                    sendMIDIBeat(socketPort).catch(e => unbindCallback());
+                }
+                readFileChanges(socketPort).catch(e => unbindCallback());
+            }
+        };
+
+        const unbindCallback = () => {
+            clock.removeListener('position', beatCallback);
+        };
+
+        clock.on('position', beatCallback);
+    });
 
     watch(`${BUFFERS_LOCATION}`, { recursive: false }, (evt, name) => {
         const bufferName = name.replace(SERVER_PATH, '');
