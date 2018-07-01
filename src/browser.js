@@ -1,6 +1,8 @@
 var AudioContext = window.AudioContext || window.webkitAudioContext;
 var context = new AudioContext();
 
+let timerWorker = null;
+
 // Custom event dispatcher
 function Dispatcher(options) {
     // TODO: do this without a DOM using EventEmitter
@@ -97,6 +99,7 @@ function loop(name, handler) {
 const sleep = ticks => new Promise();
 
 function setTempo(bpm) {
+    // TODO: make this use the web-worker...
     fetch(`http://${window.location.host}/updateBpm`, {
         method: 'POST',
         headers: {
@@ -196,7 +199,7 @@ const handleMessage = msg => {
 
     // Message type 2
     if (msgParts[1] === 'midi') {
-        if (msgParts[2] === 'beat') {
+        if (msgParts[2] === 'beat' || tick % 24 === 0) {
             beatCounter++;
             const evt = new CustomEvent('beat', {
                 detail: { sequenceId: beatCounter },
@@ -213,9 +216,20 @@ const handleMessage = msg => {
     }
 };
 
-const initOSC = () => {
+const initClock = () => {
     // noop when using browser clock
-    if (USE_BROWSER_CLOCK) return;
+    if (USE_BROWSER_CLOCK) {
+        timerWorker = new Worker('/browser-worker.js');
+        timerWorker.onmessage = e => {
+            if (e.data === 'tick') {
+                handleMessage({ address: '/midi/tick' });
+            } else {
+                console.log('messge', e);
+            }
+        };
+        timerWorker.postMessage('start');
+        return;
+    }
 
     // Init container
 
@@ -234,7 +248,7 @@ const initOSC = () => {
 };
 
 // used later to start OSC
-window.initOSC = initOSC();
+window.initClock = initClock();
 
 // Additional code below
 

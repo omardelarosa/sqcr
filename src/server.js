@@ -22,17 +22,16 @@ let clockIsRunning = false;
 let fileChangesHashMap = {};
 
 // TODO: avoid loading the entire file into memory
-const BROWSER_SCRIPT = fs
-    .readFileSync(path.join(__dirname, 'browser.js'))
-    .toString();
-const OSC_BROWSER_SCRIPT = fs
-    .readFileSync(
-        path.join(__dirname, '..', 'node_modules/osc/dist/osc-browser.js'),
-    )
-    .toString();
-const TONAL_BROWSER_SCRIPT = fs.readFileSync(
-    path.join(__dirname, '..', 'node_modules/tonal/build/transpiled.js'),
-);
+
+const loadFile = fileparts =>
+    fs.readFileSync(path.join(...fileparts)).toString();
+
+const BROWSER_SCRIPT = () => loadFile([__dirname, 'browser.js']);
+const BROWSER_WORKER_SCRIPT = () => loadFile([__dirname, 'browser-worker.js']);
+const OSC_BROWSER_SCRIPT = () =>
+    loadFile([__dirname, '..', 'node_modules/osc/dist/osc-browser.js']);
+const TONAL_BROWSER_SCRIPT = () =>
+    loadFile([__dirname, '..', 'node_modules/tonal/build/transpiled.js']);
 
 const getIPAddresses = () => {
     const os = require('os');
@@ -170,17 +169,22 @@ function startServer(opts = {}) {
     // static libs
     app.get('/browser.js', (req, res) => {
         res.set('Content-Type', 'application/javascript');
-        res.send(BROWSER_SCRIPT);
+        res.send(BROWSER_SCRIPT());
+    });
+
+    app.get('/browser-worker.js', (req, res) => {
+        res.set('Content-Type', 'application/javascript');
+        res.send(BROWSER_WORKER_SCRIPT());
     });
 
     app.get('/osc-browser.js', (req, res) => {
         res.set('Content-Type', 'application/javascript');
-        res.send(OSC_BROWSER_SCRIPT);
+        res.send(OSC_BROWSER_SCRIPT());
     });
 
     app.get('/tonal.js', (req, res) => {
         res.set('Content-Type', 'application/javascript');
-        res.send(TONAL_BROWSER_SCRIPT);
+        res.send(TONAL_BROWSER_SCRIPT());
     });
 
     app.use('/', express.static(appResources));
@@ -189,9 +193,9 @@ function startServer(opts = {}) {
     app.get('/', (req, res) => {
         res.send(
             exampleTemplate(
-                OSC_BROWSER_SCRIPT,
-                BROWSER_SCRIPT,
-                TONAL_BROWSER_SCRIPT,
+                OSC_BROWSER_SCRIPT(),
+                BROWSER_SCRIPT(),
+                TONAL_BROWSER_SCRIPT(),
                 b,
                 INIT_FILE_NAME,
                 USE_BROWSER_CLOCK,
