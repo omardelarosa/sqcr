@@ -203,14 +203,14 @@ function scheduleTicks(numTicks, currentTick) {
                 // Do not schedule...
                 continue;
             }
-            pendingTicks.add(s);
-            if (i === 0) {
-                processLoops(s);
-            } else {
-                let timer = setTimeout(() => {
-                    processLoops(s);
-                }, i * __tickInterval);
-            }
+            scheduleTick(s, i);
+            // if (i === 0) {
+            //     processLoops(s);
+            // } else {
+            //     let timer = setTimeout(() => {
+            //         processLoops(s);
+            //     }, i * __tickInterval);
+            // }
             i++;
         }
         // Once per "cycle", more CPU heavy
@@ -221,8 +221,14 @@ function scheduleTicks(numTicks, currentTick) {
 
 function doTick() {}
 
-function scheduledCall(fn, delay) {
-    setTimeout(fn, delay);
+function scheduleTick(t, queueRank) {
+    pendingTicks.add(t);
+    timerWorker.postMessage({
+        scheduleLoop: true,
+        tickID: t,
+        queueRank,
+        tickInterval: __tickInterval,
+    });
 }
 
 // TODO: create central event dispatcher
@@ -267,10 +273,15 @@ const initClock = () => {
         timerWorker.onmessage = e => {
             if (e.data === 'tick') {
                 handleMessage({ address: '/midi/tick' });
+            } else if (e.data && e.data.event === 'processLoops') {
+                const { tick: tickToProcess } = e.data;
+                // console.log('TICK TO PROCESS', tickToProcess);
+                processLoops(tickToProcess);
             } else {
-                console.log('messge', e);
+                console.log('message', e.data);
             }
         };
+
         timerWorker.postMessage('start');
     }
 
