@@ -1,10 +1,15 @@
 var AudioContext = window.AudioContext || window.webkitAudioContext;
 var context = new AudioContext();
 
+const DEFAULT_BPM = 60;
 let timerWorker = null;
 let __browserBPM = null;
+let HAS_STOPPED = false;
+let DEFAULT_TICKS_TO_SCHEDULE = 100;
 
-const calcTickInterval = bpm => (60 * 1000) / bpm / 24;
+const calcTickInterval = bpm => parseInt((60 * 1000) / bpm / 24);
+
+let __tickInterval = calcTickInterval(DEFAULT_BPM);
 
 // Custom event dispatcher
 function Dispatcher(options) {
@@ -22,8 +27,9 @@ let dispatcher = new Dispatcher();
 
 // Things to do on the tick
 const handleTick = ev => {
-    const sequenceId = ev.detail.sequenceId;
-    doBeat(sequenceId);
+    const t = ++tick;
+    // const sequenceId = ev.detail.sequenceId;
+    scheduleTicks(DEFAULT_TICKS_TO_SCHEDULE, t + 0);
 };
 
 // Things to do on the beat
@@ -63,7 +69,8 @@ class Loop {
         this.handler = null;
     }
 
-    run() {
+    run(t) {
+        this.tick = t;
         // Decrementer must be at the begging to account for 0th tick in sleep cycle
         this.ticksToSleep--;
         if (this.ticksToSleep <= 0) {
@@ -71,8 +78,8 @@ class Loop {
         }
 
         // Only call if not sleeping, not dead and has not been called this tick
-        if (!this.isSleeping && !this.isDead && this.lastTickCalled !== tick) {
-            this.lastTickCalled = tick;
+        if (!this.isSleeping && !this.isDead && this.lastTickCalled !== t) {
+            this.lastTickCalled = t;
             this.handler(this);
         }
     }
@@ -106,7 +113,8 @@ const sleep = ticks => new Promise();
 function setTempo(bpm) {
     if (USE_BROWSER_CLOCK) {
         __browserBPM = bpm;
-        timerWorker.postMessage({ interval: calcTickInterval(bpm) });
+        __tickInterval = calcTickInterval(bpm);
+        timerWorker.postMessage({ interval: __tickInterval });
         return;
     }
 
@@ -145,12 +153,19 @@ const loadBuffer = b => {
     // Cancel any pending loop invokations
 };
 
+let pendingTicks = new Set();
+
 const processLoops = t => {
+    // TODO: Handle case of loop has already been called on this tick
+
     const start = Date.now();
     // Limit duration of this invokation with timeout to preserve time
     Object.keys(loops).forEach(loopName => {
-        loops[loopName].run();
+        loops[loopName].run(t);
     });
+
+    // Increment global tick
+    pendingTicks.delete(t);
 };
 
 const bufferQueue = [];
@@ -168,30 +183,39 @@ let minLatency = 10;
 let lastBeat = 0;
 let lastTimeDelta = 0;
 let minDelta = 0;
+let lastScheduled = Date.now();
+let lookahead = 1000;
 
 let beatCounter = 0;
 
-function doBeat() {
-    t2 = Date.now();
-    if (lastBeat === 0) {
-        lastBeat = t2;
-        processLoops(t2);
-    } else {
-        const currentDelta = t2 - lastBeat;
-        const deltaDiff = currentDelta - lastTimeDelta;
-        lastTimeDelta = currentDelta;
-        const beat = t2 - lastBeat;
-        // decrement sleeps
-        if (sleeps > 0) {
-            sleeps -= 1;
-        } else if (deltaDiff < -10) {
-            // Ahead of time, schedule for later
-            setTimeout(() => processLoops(beat), deltaDiff * -1);
-        } else {
-            processLoops(beat);
+function scheduleTicks(numTicks, currentTick) {
+    const now = Date.now();
+    if (now - lastScheduled > lookahead) {
+        if (HAS_STOPPED) return;
+        // const ticksToSchedule = parseInt(lookahead / __tickInterval);
+        const ticksToSchedule = numTicks;
+        let i = 0;
+        while (i <= ticksToSchedule + 1) {
+            let t = parseInt(currentTick);
+            let s = t + i;
+            if (pendingTicks.has(s)) {
+                i++;
+                // Do not schedule...
+                continue;
+            }
+            pendingTicks.add(s);
+            if (i === 0) {
+                processLoops(s);
+            } else {
+                let timer = setTimeout(() => {
+                    processLoops(s);
+                }, i * __tickInterval);
+            }
+            i++;
         }
+        // Once per "cycle", more CPU heavy
         processBuffers();
-        lastBeat = t2;
+        lastScheduled = now;
     }
 }
 
@@ -218,14 +242,18 @@ const handleMessage = msg => {
         if (msgParts[2] === 'beat' || tick % 24 === 0) {
             beatCounter++;
             const evt = new CustomEvent('beat', {
-                detail: { sequenceId: beatCounter },
+                detail: {
+                    // sequenceId: beatCounter
+                },
             });
             dispatcher.dispatchEvent(evt);
         }
 
         if (msgParts[2] === 'tick') {
             const evt = new CustomEvent('tick', {
-                detail: { sequenceId: ++tick },
+                detail: {
+                    // sequenceId: ++tick
+                },
             });
             dispatcher.dispatchEvent(evt);
         }

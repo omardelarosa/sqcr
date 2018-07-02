@@ -164,8 +164,12 @@ function startServer(opts = {}) {
 
     // static libs
     app.use('/', express.static(appResources));
+
     // Serve node_modules for libs, etc
     app.use('/node_modules/', express.static(nodeModules));
+
+    // Serve src for libs, etc
+    app.use('/src/', express.static(__dirname));
 
     // fall back to example example page
     app.get('/', (req, res) => {
