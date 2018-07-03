@@ -1,10 +1,13 @@
-const osc = require('osc');
-const path = require('path');
-const express = require('express');
-const WebSocket = require('ws');
-const MidiClock = require('midi-clock');
-const watch = require('node-watch');
-const isEmpty = require('lodash/isEmpty');
+import osc from 'osc';
+import path from 'path';
+import express from 'express';
+import WebSocket from 'ws';
+import MidiClock from 'midi-clock';
+import watch from 'node-watch';
+import isEmpty from 'lodash/isEmpty';
+import fs from 'fs';
+import { exampleTemplate } from '../templates/example.html';
+
 const fs = require('fs');
 const exampleTemplate = require('./example.html');
 const clc = require('cli-color');
@@ -103,8 +106,17 @@ const updateBpm = (c, bpm) => {
     }
 };
 
+interface ServerOptions {
+    port: number;
+    serverPath?: string;
+    currentDir?: string;
+    buffers?: string;
+    init?: string;
+    useBrowserClock: boolean;
+}
+
 // Create an Express-based Web Socket server to which OSC messages will be relayed.
-function startServer(opts = {}) {
+export function startServer(opts: ServerOptions) {
     const {
         port = 8081,
         serverPath,
@@ -203,7 +215,7 @@ function startServer(opts = {}) {
     });
 
     app.post('/updateBpm', (req, res) => {
-        const { bpm } = req.body || {};
+        const { bpm } = req.body || { bpm: 120 };
         updateBpm(clock, bpm);
         D_BEAT('Tempo updated to: %d', bpm);
         res.send({ status: 'success' });
@@ -249,5 +261,3 @@ function startServer(opts = {}) {
         fileChangesHashMap[bufferName] = true;
     });
 }
-
-module.exports = startServer;

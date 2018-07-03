@@ -1,4 +1,4 @@
-const startServer = require('./src/server');
+const startServer = require('./dist/server').startServer;
 
 const SQCR = (input, flags) => {
     const serverPath = flags.path || process.cwd(); // Default to location process call

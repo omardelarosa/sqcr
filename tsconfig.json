@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "module": "system",
+        "noImplicitAny": false,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "outDir": "dist",
+        "sourceMap": true,
+        "lib": ["es2015", "dom"],
+        "typeRoots": ["node_modules/@types", "custom_typings"]
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "examples", "debug"]
+}

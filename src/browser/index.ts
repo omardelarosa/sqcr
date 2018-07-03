@@ -1,13 +1,17 @@
-var AudioContext = window.AudioContext || window.webkitAudioContext;
-var context = new AudioContext();
+import './custom_typings';
+
+import { Loop } from './Loop';
+
+const context = new AudioContext();
 
 const DEFAULT_BPM = 60;
 let timerWorker = null;
+let oscillator: OscillatorNode = null;
 let __browserBPM = null;
 let HAS_STOPPED = false;
 let DEFAULT_TICKS_TO_SCHEDULE = 100;
 
-const calcTickInterval = bpm => parseInt((60 * 1000) / bpm / 24);
+const calcTickInterval = (bpm: number) => (60 * 1000) / bpm / 24;
 
 let __tickInterval = calcTickInterval(DEFAULT_BPM);
 
@@ -23,18 +27,19 @@ const sqcr = {
     },
 };
 
-window.sqcr = sqcr;
+/** Custom event dispatcher  **/
+class Dispatcher extends Node {
+    constructor() {
+        super();
+        // TODO: do this without a DOM using EventEmitter
+        const target = document.createTextNode(null);
 
-// Custom event dispatcher
-function Dispatcher(options) {
-    // TODO: do this without a DOM using EventEmitter
-    const target = document.createTextNode(null);
+        this.addEventListener = target.addEventListener.bind(target);
+        this.removeEventListener = target.removeEventListener.bind(target);
+        this.dispatchEvent = target.dispatchEvent.bind(target);
 
-    this.addEventListener = target.addEventListener.bind(target);
-    this.removeEventListener = target.removeEventListener.bind(target);
-    this.dispatchEvent = target.dispatchEvent.bind(target);
-
-    // Other constructor stuff...
+        // Other constructor stuff...
+    }
 }
 
 let dispatcher = new Dispatcher();
@@ -61,44 +66,6 @@ let sleeps = 0;
 // TODO: make this flag "scoped" to each loop
 let loops = {};
 
-class Loop {
-    constructor({ handler, name }) {
-        this.isSleeping = false;
-        this.lastTickCalled = -1;
-        this.handler = handler;
-        this.name = name;
-        this.ticksToSleep = -1;
-        // TODO: add clean up logic
-        this.isDead = false;
-    }
-
-    sleep(amount) {
-        this.ticksToSleep = amount;
-        this.isSleeping = true;
-        return new Promise((resolve, reject) => {});
-    }
-
-    destroy() {
-        this.isDead = true;
-        this.handler = null;
-    }
-
-    run(t) {
-        this.tick = t;
-        // Decrementer must be at the begging to account for 0th tick in sleep cycle
-        this.ticksToSleep--;
-        if (this.ticksToSleep <= 0) {
-            this.isSleeping = false;
-        }
-
-        // Only call if not sleeping, not dead and has not been called this tick
-        if (!this.isSleeping && !this.isDead && this.lastTickCalled !== t) {
-            this.lastTickCalled = t;
-            this.handler(this);
-        }
-    }
-}
-
 const newLoopsQueue = [];
 
 const drainRegisterLoopQueue = () => {
@@ -122,10 +89,10 @@ function loop(name, handler) {
 
 // TODO: make sleep scoped to each loop
 // TODO: break this out into a primitive operation
-const sleep = ticks => new Promise();
+const sleep = ticks => Promise.resolve();
 
-function setTempo(bpm) {
-    if (USE_BROWSER_CLOCK) {
+function setTempo(bpm: number) {
+    if (BrowserClient.USE_BROWSER_CLOCK) {
         __browserBPM = bpm;
         __tickInterval = calcTickInterval(bpm);
         timerWorker.postMessage({ interval: __tickInterval });
@@ -277,7 +244,7 @@ const handleMessage = msg => {
 
 const initClock = () => {
     // Use web-worker for client-beat instead of backend worker
-    if (USE_BROWSER_CLOCK) {
+    if (BrowserClient.USE_BROWSER_CLOCK) {
         timerWorker = new Worker('/src/browser-worker.js');
         timerWorker.onmessage = e => {
             if (e.data === 'tick') {
@@ -330,3 +297,8 @@ WebMidi.enable(function(err) {
         console.log('WebMidi enabled!');
     }
 });
+
+export class BrowserClient {
+    public static USE_BROWSER_CLOCK: boolean = false;
+    constructor(options) {}
+}
