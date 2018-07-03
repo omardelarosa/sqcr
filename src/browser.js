@@ -11,6 +11,20 @@ const calcTickInterval = bpm => parseInt((60 * 1000) / bpm / 24);
 
 let __tickInterval = calcTickInterval(DEFAULT_BPM);
 
+// Utility functions
+const sqcr = {
+    start() {
+        HAS_STOPPED = false;
+        timerWorker.postMessage('start');
+    },
+    stop() {
+        HAS_STOPPED = true;
+        timerWorker.postMessage('stop');
+    },
+};
+
+window.sqcr = sqcr;
+
 // Custom event dispatcher
 function Dispatcher(options) {
     // TODO: do this without a DOM using EventEmitter
@@ -155,6 +169,7 @@ const loadBuffer = b => {
 
 let pendingTicks = new Set();
 
+// TODO: make scheduled ticks cancellable
 const processLoops = t => {
     // TODO: Handle case of loop has already been called on this tick
 
@@ -164,7 +179,6 @@ const processLoops = t => {
         loops[loopName].run(t);
     });
 
-    // Increment global tick
     pendingTicks.delete(t);
 };
 
@@ -190,7 +204,9 @@ let beatCounter = 0;
 
 function scheduleTicks(numTicks, currentTick) {
     const now = Date.now();
-    if (now - lastScheduled > lookahead) {
+    const since = now - lastScheduled;
+    if (since > lookahead) {
+        console.log('scheduling');
         if (HAS_STOPPED) return;
         // const ticksToSchedule = parseInt(lookahead / __tickInterval);
         const ticksToSchedule = numTicks;
@@ -204,13 +220,6 @@ function scheduleTicks(numTicks, currentTick) {
                 continue;
             }
             scheduleTick(s, i);
-            // if (i === 0) {
-            //     processLoops(s);
-            // } else {
-            //     let timer = setTimeout(() => {
-            //         processLoops(s);
-            //     }, i * __tickInterval);
-            // }
             i++;
         }
         // Once per "cycle", more CPU heavy
@@ -275,7 +284,6 @@ const initClock = () => {
                 handleMessage({ address: '/midi/tick' });
             } else if (e.data && e.data.event === 'processLoops') {
                 const { tick: tickToProcess } = e.data;
-                // console.log('TICK TO PROCESS', tickToProcess);
                 processLoops(tickToProcess);
             } else {
                 console.log('message', e.data);
