@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "module": "system",
+        "noImplicitAny": false,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "typeRoots": ["node_modules/@types", "custom_typings/**/*"]
+    },
+    "exclude": ["node_modules", "examples", "debug"]
+}

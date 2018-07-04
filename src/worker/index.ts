@@ -1,23 +1,31 @@
+// This fixes an inaccuracy in the WorkerGlobalScope typings as of TS 2.9.2
+interface IWorkerGlobalScope extends WorkerGlobalScope {
+    onmessage: (...args: any[]) => void;
+    postMessage: (...args: any[]) => void;
+}
+
+const s = <IWorkerGlobalScope>self;
+
 let timerID = null;
 let interval = 41; // 60 BPM
 let scheduledTicks = new Set();
 
-self.onmessage = function(e) {
+s.onmessage = e => {
     if (e.data === 'start') {
         console.log('starting');
-        timerID = setInterval(() => postMessage('tick'), interval);
+        timerID = setInterval(() => s.postMessage('tick'), interval);
     } else if (e.data.interval) {
         // Update interval
-        interval = parseInt(interval); // Ronded to int.
+        interval = Number(interval); // Ronded to int.
         clearInterval(timerID);
-        timerID = setInterval(() => postMessage('tick'), interval);
+        timerID = setInterval(() => s.postMessage('tick'), interval);
     } else if (e.data.scheduleLoop) {
         const { tickID, tickInterval, queueRank } = e.data;
         const tick = parseInt(e.data.tickID);
         let timer = setTimeout(() => {
             if (!scheduledTicks.has(timer)) return;
             // Process loops
-            postMessage({ event: 'processLoops', tick });
+            s.postMessage({ event: 'processLoops', tick });
             scheduledTicks.delete(timer);
         }, queueRank * tickInterval);
         scheduledTicks.add(timer);
@@ -32,10 +40,10 @@ self.onmessage = function(e) {
             clearTimeout(t);
             scheduledTicks.delete(t);
         });
-        self.postMessage('canceled ticks: ' + i);
+        s.postMessage('canceled ticks: ' + i);
         clearInterval(timerID);
         timerID = null;
     }
 };
 
-postMessage('worker online!');
+s.postMessage('worker online!');

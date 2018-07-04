@@ -1,51 +1,56 @@
 {
-  "name": "sqcr",
-  "version": "1.0.2",
-  "description": "a command-line sequencer",
-  "repository": "omardelarosa/sqcr",
-  "author": {
-    "name": "Omar Delarosa",
-    "email": "thedelarosa@gmail.com",
-    "url": "omardelarosa.com"
-  },
-  "engines": {
-    "node": ">=8"
-  },
-  "bin": {
-    "sqcr": "./sqcr-cli.js"
-  },
-  "main": "index.js",
-  "scripts": {
-    "test": "echo 'coming soon!'"
-  },
-  "keywords": [
-    "cli",
-    "midi",
-    "util",
-    "osc",
-    "music",
-    "websockets",
-    "udp",
-    "fun"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "cli-color": "^1.2.0",
-    "debug": "^3.1.0",
-    "express": "^4.16.3",
-    "lodash": "^4.17.10",
-    "meow": "^5.0.0",
-    "midi-clock": "0.0.1",
-    "node-watch": "^0.5.8",
-    "osc": "^2.2.3",
-    "tonal": "^1.1.3",
-    "tone": "^0.12.80",
-    "typescript": "^2.9.2",
-    "webmidi": "^2.2.0",
-    "ws": "^5.2.1"
-  },
-  "devDependencies": {
-    "@types/express": "^4.16.0",
-    "@types/node": "^10.5.1"
-  }
+    "name": "sqcr",
+    "version": "1.0.2",
+    "description": "a command-line sequencer",
+    "repository": "omardelarosa/sqcr",
+    "author": {
+        "name": "Omar Delarosa",
+        "email": "thedelarosa@gmail.com",
+        "url": "omardelarosa.com"
+    },
+    "engines": {
+        "node": ">=8"
+    },
+    "bin": {
+        "sqcr": "./sqcr-cli.js"
+    },
+    "main": "index.js",
+    "scripts": {
+        "test": "echo 'coming soon!'",
+        "build":
+            "npm run build:browser && npm run build:worker && npm run build:server",
+        "build:browser": "tsc -p src/browser/tsconfig.json",
+        "build:server": "echo 'COMING SOON'",
+        "build:worker": "tsc -p src/worker/tsconfig.json"
+    },
+    "keywords": [
+        "cli",
+        "midi",
+        "util",
+        "osc",
+        "music",
+        "websockets",
+        "udp",
+        "fun"
+    ],
+    "license": "MIT",
+    "dependencies": {
+        "cli-color": "^1.2.0",
+        "debug": "^3.1.0",
+        "express": "^4.16.3",
+        "lodash": "^4.17.10",
+        "meow": "^5.0.0",
+        "midi-clock": "0.0.1",
+        "node-watch": "^0.5.8",
+        "osc": "^2.2.3",
+        "tonal": "^1.1.3",
+        "tone": "^0.12.80",
+        "typescript": "^2.9.2",
+        "webmidi": "^2.2.0",
+        "ws": "^5.2.1"
+    },
+    "devDependencies": {
+        "@types/express": "^4.16.0",
+        "@types/node": "^10.5.1"
+    }
 }

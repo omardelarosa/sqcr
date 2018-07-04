@@ -1,15 +1,16 @@
+var s = self;
 var timerID = null;
 var interval = 41;
 var scheduledTicks = new Set();
-self.onmessage = function (e) {
+s.onmessage = function (e) {
     if (e.data === 'start') {
         console.log('starting');
-        timerID = setInterval(function () { return postMessage('tick'); }, interval);
+        timerID = setInterval(function () { return s.postMessage('tick'); }, interval);
     }
     else if (e.data.interval) {
-        interval = parseInt(interval);
+        interval = Number(interval);
         clearInterval(timerID);
-        timerID = setInterval(function () { return postMessage('tick'); }, interval);
+        timerID = setInterval(function () { return s.postMessage('tick'); }, interval);
     }
     else if (e.data.scheduleLoop) {
         var _a = e.data, tickID = _a.tickID, tickInterval = _a.tickInterval, queueRank = _a.queueRank;
@@ -17,7 +18,7 @@ self.onmessage = function (e) {
         var timer_1 = setTimeout(function () {
             if (!scheduledTicks.has(timer_1))
                 return;
-            postMessage({ event: 'processLoops', tick: tick_1 });
+            s.postMessage({ event: 'processLoops', tick: tick_1 });
             scheduledTicks["delete"](timer_1);
         }, queueRank * tickInterval);
         scheduledTicks.add(timer_1);
@@ -30,10 +31,10 @@ self.onmessage = function (e) {
             clearTimeout(t);
             scheduledTicks["delete"](t);
         });
-        self.postMessage('canceled ticks: ' + i_1);
+        s.postMessage('canceled ticks: ' + i_1);
         clearInterval(timerID);
         timerID = null;
     }
 };
-postMessage('worker online!');
-//# sourceMappingURL=worker.js.map
+s.postMessage('worker online!');
+//# sourceMappingURL=browser-worker.js.map
