@@ -1,15 +1,13 @@
-import osc from 'osc';
 import path from 'path';
 import express from 'express';
-import WebSocket from 'ws';
-import MidiClock from 'midi-clock';
-import watch from 'node-watch';
-import isEmpty from 'lodash/isEmpty';
-import fs from 'fs';
+import * as WebSocket from 'ws';
+import { isEmpty } from 'lodash';
 import { exampleTemplate } from '../templates/example.html';
 
+const osc = require('osc');
 const fs = require('fs');
-const exampleTemplate = require('./example.html');
+const MidiClock = require('midi-clock');
+const watch = require('node-watch');
 const clc = require('cli-color');
 const ASCII_TEXT = require('./ascii').ASCII_TEXT;
 

@@ -17,10 +17,9 @@
     "main": "index.js",
     "scripts": {
         "test": "echo 'coming soon!'",
-        "build":
-            "npm run build:browser && npm run build:worker && npm run build:server",
-        "build:browser": "tsc -p src/browser/tsconfig.json",
-        "build:server": "echo 'COMING SOON'",
+        "build": "npm run build:browser && npm run build:worker && npm run build:server",
+        "build:browser": "webpack --config config/webpack.config.js",
+        "build:server": "tsc -p src/server/tsconfig.json",
         "build:worker": "tsc -p src/worker/tsconfig.json"
     },
     "keywords": [
@@ -51,6 +50,11 @@
     },
     "devDependencies": {
         "@types/express": "^4.16.0",
-        "@types/node": "^10.5.1"
+        "@types/lodash": "^4.14.110",
+        "@types/node": "^10.5.1",
+        "@types/ws": "^5.1.2",
+        "ts-loader": "^4.4.2",
+        "webpack": "^4.14.0",
+        "webpack-cli": "^3.0.8"
     }
 }

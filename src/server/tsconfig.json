@@ -1,0 +1,8 @@
+{
+    "extends": "../../config/tsconfig.base.json",
+    "compilerOptions": {
+        "lib": ["es7"],
+        "outFile": "../../lib/server.js"
+    },
+    "files": ["index.ts"]
+}

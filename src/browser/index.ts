@@ -73,11 +73,11 @@ export class BrowserClient {
         this.setAudioContext();
         this.setDispatcher();
         this.setTickInterval();
+        this.startClock();
     }
 
     public setDispatcher(D = Dispatcher) {
         this.dispatcher = new D();
-
         this.dispatcher.addEventListener(EVENTS.TICK, this.onTick);
         this.dispatcher.addEventListener(EVENTS.BEAT, this.onBeat);
     }
@@ -333,6 +333,7 @@ export class BrowserClient {
         }
 
         this.startOSCListen();
+        this.setupMIDI((<any>window).WebMidi);
     }
 
     // Sets window-level globals -- UH OH
