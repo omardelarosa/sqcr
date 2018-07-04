@@ -1,7 +1,10 @@
 /** Custom event dispatcher  **/
-export class Dispatcher extends Node {
+export class Dispatcher {
+    public addEventListener: any;
+    public removeEventListener: any;
+    public dispatchEvent: any;
+
     constructor() {
-        super();
         // TODO: do this without a DOM using EventEmitter
         const target = document.createTextNode(null);
 

@@ -17,10 +17,12 @@
     "main": "index.js",
     "scripts": {
         "test": "echo 'coming soon!'",
-        "build": "npm run build:browser && npm run build:worker && npm run build:server",
+        "build":
+            "npm run build:browser && npm run build:worker && npm run build:server",
         "build:browser": "webpack --config config/webpack.config.js",
         "build:server": "tsc -p src/server/tsconfig.json",
-        "build:worker": "tsc -p src/worker/tsconfig.json"
+        "build:worker": "tsc -p src/worker/tsconfig.json",
+        "start:debug": "./sqcr-cli.js debug --useBrowser"
     },
     "keywords": [
         "cli",

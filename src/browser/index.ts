@@ -1,7 +1,13 @@
-import './custom_typings';
-
 import { Loop } from './Loop';
 import { Dispatcher } from './Dispatcher';
+import {
+    IWindow,
+    OSCEvent,
+    WorkerEvent,
+    IBrowserClientOptions,
+    UnregisteredLoop,
+    OSCPort,
+} from './typings';
 
 const DEFAULT_BPM = 60;
 const DEFAULT_LOOKAHEAD_MS = 1000;
@@ -11,47 +17,21 @@ const EVENTS = {
     BEAT: 'BEAT',
 };
 
-interface IBaseEvent {
-    address: string;
-}
-
-interface OSCEvent extends IBaseEvent {}
-
-interface WorkerEvent extends IBaseEvent {}
-
-interface OSCPort {
-    on: (s: string, cb: (ev: OSCEvent) => void) => void;
-    open: (...args: any[]) => void;
-}
-
-interface IMessage {
-    event: string;
-    data: Record<string, any>;
-}
-
-interface IBrowserClientOptions {
-    bpm?: number;
-}
-
-interface UnregisteredLoop {
-    name: string;
-    handler: (ctx: Loop) => void;
-}
-
 const calcTickInterval = (bpm: number) =>
     (60 * 1000) / bpm / DEFAULT_TICK_RESOLUTION;
 
 export class BrowserClient {
     public static EVENTS = EVENTS;
     public static OSC: any; // OSC.js library ref
+    public static MIDI: any; // WebMidi library ref
     public static LOOKAHEAD = DEFAULT_LOOKAHEAD_MS;
     public static USE_BROWSER_CLOCK: boolean = false;
     public static DEFAULT_BPM: number = DEFAULT_BPM;
     public static DEFAULT_TICKS_TO_SCHEDULE: number = 100;
     public static currentBrowserBPM: number = DEFAULT_BPM;
     public static calcTickInterval = calcTickInterval;
+    public timerWorker: Worker = null;
 
-    private timerWorker: any = null;
     private oscillator: OscillatorNode = null;
     private context: AudioContext;
     private lastScheduledTickTimestamp: number;
@@ -69,11 +49,12 @@ export class BrowserClient {
 
     constructor() {}
 
-    public init(options: IBrowserClientOptions): void {
+    public init(options?: IBrowserClientOptions): void {
         this.setAudioContext();
         this.setDispatcher();
         this.setTickInterval();
         this.startClock();
+        this.setGlobals(<IWindow>window);
     }
 
     public setDispatcher(D = Dispatcher) {
@@ -119,6 +100,7 @@ export class BrowserClient {
 
     // Process Events -- TODO: type-annotation OSC.js
     public onMessage = (msg: WorkerEvent | OSCEvent): void => {
+        // console.log('message', msg);
         const address = msg.address || '';
         // Message type 1
         const msgParts: string[] = address.split('/');
@@ -171,6 +153,7 @@ export class BrowserClient {
         name: string,
         handler: (ctx: Loop) => void,
     ): void => {
+        console.log('REGISTER LOOP', name, handler);
         this.newLoopsQueue.push({ name, handler });
     };
 
@@ -276,7 +259,7 @@ export class BrowserClient {
     }
 
     public startTimerWorker(): void {
-        this.timerWorker = new Worker('/dist/browser-worker.js');
+        this.timerWorker = new Worker('/lib/worker.js');
         this.timerWorker.onmessage = e => {
             if (e.data === 'tick') {
                 this.onMessage({ address: '/midi/tick' });
@@ -304,9 +287,9 @@ export class BrowserClient {
         oscPort.open();
     }
 
-    public setupMIDI(WebMidi): void {
+    public setupMIDI(): void {
         // MIDI Testing
-        WebMidi.enable(function(err) {
+        BrowserClient.MIDI.enable(function(err) {
             if (err) {
                 console.log('WebMidi could not be enabled.', err);
             } else {
@@ -315,9 +298,9 @@ export class BrowserClient {
         });
     }
 
-    public getOutputs = (WebMidi): any => {
+    public getOutputs = (): any => {
         // MIDI Testing
-        WebMidi.enable(function(err) {
+        BrowserClient.MIDI.enable(function(err) {
             if (err) {
                 console.log('WebMidi could not be enabled.', err);
             } else {
@@ -333,14 +316,19 @@ export class BrowserClient {
         }
 
         this.startOSCListen();
-        this.setupMIDI((<any>window).WebMidi);
+        this.setupMIDI();
     }
 
     // Sets window-level globals -- UH OH
-    public setGlobals(): void {
+    public setGlobals(WINDOW: IWindow): void {
         // TODO: add proper type annotations
-        (<any>window).loop = this.registerLoop;
-        (<any>window).setTempo = this.setTempo;
-        (<any>window).playNote = this.playNote;
+        WINDOW.loop = this.registerLoop;
+        WINDOW.setTempo = this.setTempo;
+        WINDOW.playNote = this.playNote;
+        WINDOW.tickInterval = this.tickInterval;
+        WINDOW.T = this.T;
+        WINDOW.M = this.M;
+        WINDOW.sqcr = this;
+        WINDOW.BrowserClient = BrowserClient;
     }
 }

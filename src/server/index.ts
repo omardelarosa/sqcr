@@ -1,15 +1,17 @@
-import path from 'path';
-import express from 'express';
+import * as path from 'path';
+import * as express from 'express';
 import * as WebSocket from 'ws';
+import * as fs from 'fs';
 import { isEmpty } from 'lodash';
-import { exampleTemplate } from '../templates/example.html';
 
+import { exampleTemplate } from '../templates/example.html';
+import { ASCII_TEXT } from '../templates/ascii';
+
+// Non-TS modules
 const osc = require('osc');
-const fs = require('fs');
 const MidiClock = require('midi-clock');
 const watch = require('node-watch');
 const clc = require('cli-color');
-const ASCII_TEXT = require('./ascii').ASCII_TEXT;
 
 const debug = require('debug');
 
@@ -28,8 +30,8 @@ const loadFile = fileparts =>
 
 // Libraries -- TODO make this configurable via json file
 const WEB_MIDI_LIB_PATH = '/node_modules/webmidi/webmidi.min.js';
-const BROWSER_WORKER_SCRIPT_PATH = '/src/browser-worker.js';
-const BROWSER_SCRIPT_PATH = '/src/browser.js';
+const BROWSER_WORKER_SCRIPT_PATH = '/lib/worker.js';
+const BROWSER_SCRIPT_PATH = '/lib/browser.js';
 const OSC_BROWSER_SCRIPT_PATH = '/node_modules/osc/dist/osc-browser.js';
 const TONAL_BROWSER_SCRIPT_PATH = '/node_modules/tonal/build/transpiled.js';
 const TONE_LIB_BROWSER_SCRIPT = '/node_modules/tone/build/Tone.min.js';
@@ -179,7 +181,7 @@ export function startServer(opts: ServerOptions) {
     app.use('/node_modules/', express.static(nodeModules));
 
     // Serve src for libs, etc
-    app.use('/src/', express.static(__dirname));
+    app.use('/lib/', express.static(__dirname));
 
     // fall back to example example page
     app.get('/', (req, res) => {

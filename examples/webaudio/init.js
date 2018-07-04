@@ -37,4 +37,4 @@ sampler = new Tone.Sampler(
 ).toMaster();
 
 // Define loops once
-bufferQueue.push(`${BUFFER_PATH}/loops.js`);
+sqcr.bufferQueue.push(`${BUFFER_PATH}/loops.js`);
