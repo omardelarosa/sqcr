@@ -10,7 +10,7 @@ System.register(["./custom_typings", "./Loop"], function (exports_1, context_1) 
             d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
         };
     })();
-    var Loop_1, context, DEFAULT_BPM, timerWorker, oscillator, __browserBPM, HAS_STOPPED, DEFAULT_TICKS_TO_SCHEDULE, calcTickInterval, __tickInterval, sqcr, Dispatcher, dispatcher, handleTick, handleBeat, tick, T, sleeps, loops, newLoopsQueue, drainRegisterLoopQueue, sleep, playNote, loadBuffer, pendingTicks, processLoops, bufferQueue, processBuffers, data, avgGap, minLatency, lastBeat, lastTimeDelta, minDelta, lastScheduled, lookahead, beatCounter, handleMessage, initClock, getOutputs, BrowserClient;
+    var Loop_1, BrowserClient, context, DEFAULT_BPM, timerWorker, oscillator, __browserBPM, HAS_STOPPED, DEFAULT_TICKS_TO_SCHEDULE, calcTickInterval, __tickInterval, sqcr, Dispatcher, dispatcher, handleTick, handleBeat, tick, T, sleeps, loops, newLoopsQueue, drainRegisterLoopQueue, sleep, playNote, loadBuffer, pendingTicks, processLoops, bufferQueue, processBuffers, data, avgGap, minLatency, lastBeat, lastTimeDelta, minDelta, lastScheduled, lookahead, beatCounter, handleMessage, initClock, getOutputs;
     var __moduleName = context_1 && context_1.id;
     function loop(name, handler) {
         newLoopsQueue.push({ name: name, handler: handler });
@@ -74,6 +74,13 @@ System.register(["./custom_typings", "./Loop"], function (exports_1, context_1) 
             }
         ],
         execute: function () {
+            BrowserClient = (function () {
+                function BrowserClient(options) {
+                }
+                BrowserClient.USE_BROWSER_CLOCK = false;
+                return BrowserClient;
+            }());
+            exports_1("BrowserClient", BrowserClient);
             context = new AudioContext();
             DEFAULT_BPM = 60;
             timerWorker = null;
@@ -144,7 +151,7 @@ System.register(["./custom_typings", "./Loop"], function (exports_1, context_1) 
             };
             loadBuffer = function (b) {
                 var $buffers = document.querySelectorAll('.buffer-script');
-                $buffers.forEach(function (b) { return b.remove(); });
+                Array.from($buffers).forEach(function (b) { return b.remove(); });
                 var $buffer = document.createElement('script');
                 var ts = Date.now();
                 $buffer.src = b + "?" + ts;
@@ -213,7 +220,7 @@ System.register(["./custom_typings", "./Loop"], function (exports_1, context_1) 
                     };
                     timerWorker.postMessage('start');
                 }
-                oscPort = new osc.WebSocketPort({
+                var oscPort = new window.osc.WebSocketPort({
                     url: "ws://" + window.location.host
                 });
                 oscPort.on('message', function (msg) {
@@ -223,14 +230,14 @@ System.register(["./custom_typings", "./Loop"], function (exports_1, context_1) 
             };
             window.initClock = initClock();
             getOutputs = function () {
-                if (WebMidi.enabled) {
-                    return WebMidi.outputs;
+                if (window.WebMidi.enabled) {
+                    return window.WebMidi.outputs;
                 }
                 else {
                     return [];
                 }
             };
-            WebMidi.enable(function (err) {
+            window.WebMidi.enable(function (err) {
                 if (err) {
                     console.log('WebMidi could not be enabled.', err);
                 }
@@ -238,13 +245,6 @@ System.register(["./custom_typings", "./Loop"], function (exports_1, context_1) 
                     console.log('WebMidi enabled!');
                 }
             });
-            BrowserClient = (function () {
-                function BrowserClient(options) {
-                }
-                BrowserClient.USE_BROWSER_CLOCK = false;
-                return BrowserClient;
-            }());
-            exports_1("BrowserClient", BrowserClient);
         }
     };
 });

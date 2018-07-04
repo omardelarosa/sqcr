@@ -2,6 +2,16 @@ import './custom_typings';
 
 import { Loop } from './Loop';
 
+export class BrowserClient {
+    public static USE_BROWSER_CLOCK: boolean = false;
+    constructor(options) {}
+}
+
+interface OSCPort {
+    on: (s: string, cb: (ev: Event) => void) => void;
+    open: (...args: any[]) => void;
+}
+
 const context = new AudioContext();
 
 const DEFAULT_BPM = 60;
@@ -125,7 +135,7 @@ const playNote = n => {
 
 const loadBuffer = b => {
     const $buffers = document.querySelectorAll('.buffer-script');
-    $buffers.forEach(b => b.remove());
+    Array.from($buffers).forEach(b => b.remove());
     const $buffer = document.createElement('script');
     const ts = Date.now();
     $buffer.src = `${b}?${ts}`;
@@ -263,7 +273,7 @@ const initClock = () => {
     // Init container
 
     // Init port
-    oscPort = new osc.WebSocketPort({
+    let oscPort: OSCPort = new window.osc.WebSocketPort({
         url: `ws://${window.location.host}`,
     });
 
@@ -276,29 +286,24 @@ const initClock = () => {
     oscPort.open();
 };
 
-// used later to start OSC
+/** used later to start OSC **/
 window.initClock = initClock();
 
 // Additional code below
 
 const getOutputs = () => {
-    if (WebMidi.enabled) {
-        return WebMidi.outputs;
+    if (window.WebMidi.enabled) {
+        return window.WebMidi.outputs;
     } else {
         return [];
     }
 };
 
 // MIDI Testing
-WebMidi.enable(function(err) {
+window.WebMidi.enable(function(err) {
     if (err) {
         console.log('WebMidi could not be enabled.', err);
     } else {
         console.log('WebMidi enabled!');
     }
 });
-
-export class BrowserClient {
-    public static USE_BROWSER_CLOCK: boolean = false;
-    constructor(options) {}
-}

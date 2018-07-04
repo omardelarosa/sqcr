@@ -4,4 +4,10 @@
 
 declare global {
     // Defined in the global template file
+    interface Window {
+        sqcr: any;
+        osc: any;
+        initClock: any;
+        WebMidi: any;
+    }
 }
