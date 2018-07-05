@@ -9,7 +9,7 @@ export class Loop {
     private lastTickCalled: number = -1;
 
     constructor({ handler, name }) {
-        this.handler = handler;
+        this.handler = handler.bind(this);
         this.name = name;
         this.isDead = false;
     }
@@ -26,7 +26,6 @@ export class Loop {
     }
 
     run(t: number): void {
-        console.log('RUNNING', t, this);
         this.tick = t;
         // Decrementer must be at the begging to account for 0th tick in sleep cycle
         this.ticksToSleep--;

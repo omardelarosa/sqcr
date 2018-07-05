@@ -34,7 +34,7 @@ export class BrowserClient {
 
     private oscillator: OscillatorNode = null;
     private context: AudioContext;
-    private lastScheduledTickTimestamp: number;
+    private lastScheduledTickTimestamp: number = Date.now();
     private tickInterval: number;
     private pendingTicks: Set<number> = new Set();
     private hasStopped: boolean = false;
@@ -87,7 +87,7 @@ export class BrowserClient {
     // aka handleTick
     public onTick = (ev: Event): void => {
         this.incrementTicks();
-        this.scheduleTick(
+        this.scheduleTicks(
             BrowserClient.DEFAULT_TICKS_TO_SCHEDULE,
             this.getCurrentTick(),
         );
@@ -216,17 +216,17 @@ export class BrowserClient {
     }
 
     public processBuffers() {
+        console.log('PROCESSING BUFFERS', this.bufferQueue);
         while (this.bufferQueue.length) {
             this.loadBuffer(this.bufferQueue.shift());
         }
     }
 
     public scheduleTicks(numTicks: number, currentTick: number): void {
-        const lastScheduled = this.lastScheduledTickTimestamp || Date.now();
+        const lastScheduled = this.lastScheduledTickTimestamp;
         const now = Date.now();
         const since = now - lastScheduled;
         if (since > BrowserClient.LOOKAHEAD) {
-            console.log('scheduling');
             if (this.hasStopped) return;
             // const ticksToSchedule = parseInt(BrowserClient.LOOKAHEAD / this.tickInterval);
             const ticksToSchedule = numTicks;
@@ -249,6 +249,7 @@ export class BrowserClient {
     }
 
     public scheduleTick(t: number, queueRank: number): void {
+        // console.log('SCHEDULE TICK', t);
         this.pendingTicks.add(t);
         this.timerWorker.postMessage({
             scheduleLoop: true,
