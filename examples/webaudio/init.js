@@ -1,5 +1,5 @@
 setTempo(60);
-console.log('INIT');
+
 // Make an array of notes
 notes = ['C4', 'E4', 'G4', 'C5', 'G5', 'E5'];
 

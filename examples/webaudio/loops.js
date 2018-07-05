@@ -2,7 +2,7 @@
 
 // Resets pulse to start loops together
 pulse = 0;
-console.log('loooop', loop);
+
 loop('pulse', async ctx => {
     pulse++;
     ctx.sleep(T / 4);

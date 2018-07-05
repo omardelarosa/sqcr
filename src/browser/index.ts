@@ -25,7 +25,7 @@ export class BrowserClient {
     public static OSC: any; // OSC.js library ref
     public static MIDI: any; // WebMidi library ref
     public static LOOKAHEAD = DEFAULT_LOOKAHEAD_MS;
-    public static USE_BROWSER_CLOCK: boolean = false;
+    public static USE_BROWSER_CLOCK: boolean = true;
     public static DEFAULT_BPM: number = DEFAULT_BPM;
     public static DEFAULT_TICKS_TO_SCHEDULE: number = 100;
     public static currentBrowserBPM: number = DEFAULT_BPM;
@@ -153,12 +153,12 @@ export class BrowserClient {
         name: string,
         handler: (ctx: Loop) => void,
     ): void => {
-        console.log('REGISTER LOOP', name, handler);
         this.newLoopsQueue.push({ name, handler });
     };
 
     public setTempo = bpm => {
         if (BrowserClient.USE_BROWSER_CLOCK) {
+            console.log('using browser clock!');
             BrowserClient.currentBrowserBPM = bpm;
             this.tickInterval = calcTickInterval(bpm);
             this.timerWorker.postMessage({
@@ -216,7 +216,6 @@ export class BrowserClient {
     }
 
     public processBuffers() {
-        console.log('PROCESSING BUFFERS', this.bufferQueue);
         while (this.bufferQueue.length) {
             this.loadBuffer(this.bufferQueue.shift());
         }
@@ -249,7 +248,6 @@ export class BrowserClient {
     }
 
     public scheduleTick(t: number, queueRank: number): void {
-        // console.log('SCHEDULE TICK', t);
         this.pendingTicks.add(t);
         this.timerWorker.postMessage({
             scheduleLoop: true,
