@@ -164,7 +164,8 @@ export function startServer(opts: ServerOptions) {
 
     // Create an Express-based Web Socket server to which OSC messages will be relayed.
     const appResources = serverPath;
-    const nodeModules = path.join(__dirname, '..', 'node_modules');
+    const nodeModules = path.join(__dirname, '..', '..', 'node_modules');
+    const libPath = path.join(__dirname, '..', '..', 'lib');
 
     const app = express();
     const server = app.listen(port);
@@ -181,7 +182,7 @@ export function startServer(opts: ServerOptions) {
     app.use('/node_modules/', express.static(nodeModules));
 
     // Serve src for libs, etc
-    app.use('/lib/', express.static(__dirname));
+    app.use('/lib/', express.static(libPath));
 
     // fall back to example example page
     app.get('/', (req, res) => {
