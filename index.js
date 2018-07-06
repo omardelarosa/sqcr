@@ -6,7 +6,8 @@ const SQCR = (input, flags) => {
     const port = flags.port;
     const buffers = input[0] || flags.buffers;
     const initFileName = flags.init || 'init.js';
-    const useBrowserClock = flags.browser || false;
+    const useBrowserClock =
+        flags.browser === undefined ? true : !!flags.browser;
     startServer({
         port,
         serverPath,
