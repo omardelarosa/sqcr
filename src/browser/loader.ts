@@ -7,8 +7,6 @@ BrowserClient.OSC = osc;
 BrowserClient.MIDI = WebMidi;
 BrowserClient.USE_BROWSER_CLOCK = true;
 
-const bs = new BrowserClient();
+const sqcr = new BrowserClient();
 
-console.log('BS', bs);
-
-bs.init();
+sqcr.init();

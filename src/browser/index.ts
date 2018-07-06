@@ -43,6 +43,7 @@ export class BrowserClient {
     private newLoopsQueue: UnregisteredLoop[] = []; // TODO: remove any
     private tick: number = 0;
     private beat: number = 0;
+    private isFirstBeat: boolean = true;
     private loops: Record<string, Loop> = {};
     private T: number = DEFAULT_TICK_RESOLUTION;
     private M: number = 4 * DEFAULT_TICK_RESOLUTION;
@@ -93,8 +94,18 @@ export class BrowserClient {
         );
     };
 
+    public onFirstBeat = (ev: Event): void => {
+        // noop -- re-assignable
+    };
+
     // aka handleBeat
     public onBeat = (ev: Event): void => {
+        // Init callback
+        if (this.isFirstBeat) {
+            this.onFirstBeat(ev);
+            this.isFirstBeat = false;
+        }
+
         this.drainRegisterLoopQueue();
     };
 
@@ -320,14 +331,14 @@ export class BrowserClient {
 
     // Sets window-level globals -- UH OH
     public setGlobals(WINDOW: IWindow): void {
-        // TODO: add proper type annotations
+        // TODO: add proper type annotations for Window globals
         WINDOW.loop = this.registerLoop;
         WINDOW.setTempo = this.setTempo;
         WINDOW.playNote = this.playNote;
         WINDOW.tickInterval = this.tickInterval;
         WINDOW.T = this.T;
         WINDOW.M = this.M;
-        WINDOW.sqcr = this;
+        WINDOW.sqcr = this; // exposes API as global
         WINDOW.BrowserClient = BrowserClient;
     }
 }
