@@ -15,7 +15,8 @@ const cli = meow(
         --bpm, -b       initial BPM
         --path, -d      specify root path of server
         --init, -i      init file name
-        --browser, -bc  use browser clock
+        --clock, -sc    use server clock
+        --config, -c    config file path
 `,
     {
         flags: {
@@ -39,9 +40,13 @@ const cli = meow(
                 type: 'string',
                 alias: 'i',
             },
-            init: {
+            clock: {
                 type: 'boolean',
-                alias: 'bc',
+                alias: 'sc',
+            },
+            config: {
+                type: 'string',
+                alias: 'c',
             },
         },
     },

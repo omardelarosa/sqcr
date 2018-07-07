@@ -1,3 +1,5 @@
+const path = require('path');
+
 const startServer = require('./lib/server').startServer;
 
 const SQCR = (input, flags) => {
@@ -5,16 +7,19 @@ const SQCR = (input, flags) => {
     const currentDir = __dirname;
     const port = flags.port;
     const buffers = input[0] || flags.buffers;
+    const configPath = flags.config
+        ? path.join(process.cwd(), flags.config)
+        : '';
     const initFileName = flags.init || 'init.js';
-    const useBrowserClock =
-        flags.browser === undefined ? true : !!flags.browser;
+    const useServerClock = flags.clock === undefined ? false : !!flags.browser;
     startServer({
         port,
         serverPath,
         currentDir,
         buffers,
         init: initFileName,
-        useBrowserClock,
+        useServerClock,
+        configPath,
     });
 };
 

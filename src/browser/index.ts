@@ -12,6 +12,7 @@ import {
 const DEFAULT_BPM = 60;
 const DEFAULT_LOOKAHEAD_MS = 1000;
 const DEFAULT_TICK_RESOLUTION = 24;
+const DEFAULT_WORKER_PATH = '/lib/worker.js';
 const EVENTS = {
     TICK: 'TICK',
     BEAT: 'BEAT',
@@ -24,8 +25,9 @@ export class BrowserClient {
     public static EVENTS = EVENTS;
     public static OSC: any; // OSC.js library ref
     public static MIDI: any; // WebMidi library ref
+    public static WORKER_PATH: string = DEFAULT_WORKER_PATH;
     public static LOOKAHEAD = DEFAULT_LOOKAHEAD_MS;
-    public static USE_BROWSER_CLOCK: boolean = true;
+    public static USE_SERVER_CLOCK: boolean = false;
     public static DEFAULT_BPM: number = DEFAULT_BPM;
     public static DEFAULT_TICKS_TO_SCHEDULE: number = 100;
     public static currentBrowserBPM: number = DEFAULT_BPM;
@@ -168,7 +170,7 @@ export class BrowserClient {
     };
 
     public setTempo = bpm => {
-        if (BrowserClient.USE_BROWSER_CLOCK) {
+        if (!BrowserClient.USE_SERVER_CLOCK) {
             console.log('using browser clock!');
             BrowserClient.currentBrowserBPM = bpm;
             this.tickInterval = calcTickInterval(bpm);
@@ -269,7 +271,7 @@ export class BrowserClient {
     }
 
     public startTimerWorker(): void {
-        this.timerWorker = new Worker('/lib/worker.js');
+        this.timerWorker = new Worker(BrowserClient.WORKER_PATH);
         this.timerWorker.onmessage = e => {
             if (e.data === 'tick') {
                 this.onMessage({ address: '/midi/tick' });
@@ -285,6 +287,12 @@ export class BrowserClient {
     }
 
     public startOSCListen(): void {
+        if (!BrowserClient.OSC) {
+            console.warn(
+                'OSC Browser client not found!  Will not observer file changes.',
+            );
+            return;
+        }
         // Init container
         let oscPort: OSCPort = new BrowserClient.OSC.WebSocketPort({
             url: `ws://${window.location.host}`,
@@ -321,7 +329,7 @@ export class BrowserClient {
 
     public startClock(): void {
         // Use web-worker for client-beat instead of backend worker
-        if (BrowserClient.USE_BROWSER_CLOCK) {
+        if (!BrowserClient.USE_SERVER_CLOCK) {
             this.startTimerWorker();
         }
 

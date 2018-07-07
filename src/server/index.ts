@@ -28,13 +28,14 @@ let fileChangesHashMap = {};
 const loadFile = fileparts =>
     fs.readFileSync(path.join(...fileparts)).toString();
 
-// Libraries -- TODO make this configurable via json file
-const WEB_MIDI_LIB_PATH = '/node_modules/webmidi/webmidi.min.js';
-const BROWSER_WORKER_SCRIPT_PATH = '/lib/worker.js';
-const BROWSER_SCRIPT_PATH = '/lib/browser.js';
-const OSC_BROWSER_SCRIPT_PATH = '/node_modules/osc/dist/osc-browser.js';
-const TONAL_BROWSER_SCRIPT_PATH = '/node_modules/tonal/build/transpiled.js';
-const TONE_LIB_BROWSER_SCRIPT = '/node_modules/tone/build/Tone.min.js';
+// Libraries
+const DEFAULT_LIBS = [
+    '/node_modules/webmidi/webmidi.min.js',
+    '/lib/browser.js',
+    '/node_modules/osc/dist/osc-browser.js',
+    '/node_modules/tonal/build/transpiled.js',
+    '/node_modules/tone/build/Tone.min.js',
+];
 
 const getIPAddresses = () => {
     const os = require('os');
@@ -107,34 +108,66 @@ const updateBpm = (c, bpm) => {
 };
 
 interface ServerOptions {
+    libs: string[];
+    serverPath: string;
+    port: number;
+}
+
+type ConfigFile = Partial<ServerOptions>;
+
+const loadConfig = (pathToFile: string): ConfigFile => {
+    if (!pathToFile) return {};
+    let config = {};
+
+    try {
+        const configFileData = fs.readFileSync(pathToFile);
+        const configJson = JSON.parse(configFileData.toString());
+        config = configJson;
+    } catch (e) {
+        console.warn('Could not read config file: ' + pathToFile);
+        console.log(e.message);
+        console.log(e.stack);
+    }
+
+    return config;
+};
+
+interface ServerInitOptions {
     port: number;
     serverPath?: string;
     currentDir?: string;
     buffers?: string;
-    init?: string;
-    useBrowserClock: boolean;
+    init?: string; // Depricated
+    useServerClock: boolean;
+    configPath: string;
 }
 
 // Create an Express-based Web Socket server to which OSC messages will be relayed.
-export function startServer(opts: ServerOptions) {
+export function startServer(opts: ServerInitOptions) {
     const {
         port = 8081,
         serverPath,
         currentDir,
         buffers,
-        init = 'init.js',
-        useBrowserClock = false,
+        useServerClock,
+        configPath,
     } = opts;
 
     const b = buffers || 'public/_buffers';
-    const SERVER_PATH = path.resolve(serverPath);
+    const config = loadConfig(configPath);
+    const SERVER_PATH = path.resolve(config.serverPath || serverPath);
     const BUFFERS_LOCATION = path.join(SERVER_PATH, b);
-    const INIT_FILE_NAME = `${b}/${init}`;
-    const USE_BROWSER_CLOCK = useBrowserClock;
+    const USE_SERVER_CLOCK = useServerClock;
+
+    const options: ServerOptions = {
+        port: config.port || port,
+        serverPath: SERVER_PATH,
+        libs: config.libs || DEFAULT_LIBS,
+    };
 
     console.log(ASCII_TEXT);
 
-    D_SERVER('Starting server in: ', SERVER_PATH);
+    D_SERVER('Starting server in: ', options.serverPath);
 
     if (!serverPath) throw new Error('Invalid root path!');
 
@@ -186,21 +219,15 @@ export function startServer(opts: ServerOptions) {
 
     // fall back to example example page
     app.get('/', (req, res) => {
+        const libs = options.libs || DEFAULT_LIBS;
         res.send(
             exampleTemplate(
                 {
                     BUFFER_PATH: b,
-                    USE_BROWSER_CLOCK,
+                    USE_SERVER_CLOCK,
                     ASCII_TEXT,
                 },
-                [
-                    WEB_MIDI_LIB_PATH,
-                    OSC_BROWSER_SCRIPT_PATH,
-                    TONAL_BROWSER_SCRIPT_PATH,
-                    TONE_LIB_BROWSER_SCRIPT,
-                    BROWSER_SCRIPT_PATH,
-                    INIT_FILE_NAME,
-                ],
+                libs,
             ),
         );
     });
@@ -236,12 +263,12 @@ export function startServer(opts: ServerOptions) {
 
         const beatCallback = position => {
             const microPos = position % 24; // 24 ticks per event
-            if (!USE_BROWSER_CLOCK) {
+            if (USE_SERVER_CLOCK) {
                 sendMIDITick(socketPort).catch(e => unbindCallback());
             }
             if (microPos === 0) {
                 // TODO: better handle closing of browser tabs
-                if (!USE_BROWSER_CLOCK) {
+                if (USE_SERVER_CLOCK) {
                     D_BEAT('Beat: %d', position / 24);
                     sendMIDIBeat(socketPort).catch(e => unbindCallback());
                 }
@@ -257,7 +284,7 @@ export function startServer(opts: ServerOptions) {
     });
 
     watch(`${BUFFERS_LOCATION}`, { recursive: false }, (evt, name) => {
-        const bufferName = name.replace(SERVER_PATH, '');
+        const bufferName = name.replace(options.serverPath, '');
         D_FILE('%s changed.', bufferName);
         fileChangesHashMap[bufferName] = true;
     });

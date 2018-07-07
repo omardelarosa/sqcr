@@ -1,6 +1,6 @@
 interface TemplateLocals {
     BUFFER_PATH?: string;
-    USE_BROWSER_CLOCK?: boolean;
+    USE_SERVER_CLOCK?: boolean;
     ASCII_TEXT?: string;
 }
 
@@ -21,7 +21,7 @@ export const exampleTemplate = (
             <script>
                 // BROWSER ENV VARIABLES
                 var BUFFER_PATH = '${locals.BUFFER_PATH}';
-                var USE_BROWSER_CLOCK = '${locals.USE_BROWSER_CLOCK}';
+                var USE_SERVER_CLOCK = '${locals.USE_SERVER_CLOCK}';
             </script>
             ${scriptTags.join('\n')}
         </head>
