@@ -23,6 +23,7 @@ const D_SERVER = debug('server');
 let clock;
 let clockIsRunning = false;
 let fileChangesHashMap = {};
+let configFileUsed;
 
 // TODO: avoid loading the entire file into memory
 const loadFile = fileparts =>
@@ -116,13 +117,26 @@ interface ServerOptions {
 type ConfigFile = Partial<ServerOptions>;
 
 const loadConfig = (pathToFile: string): ConfigFile => {
-    if (!pathToFile) return {};
     let config = {};
+    if (!pathToFile) {
+        const defaultPath = path.join(process.cwd(), 'sqcr.json');
+        // Try to load default config
+        try {
+            const configFileData = fs.readFileSync(defaultPath);
+            const configJson = JSON.parse(configFileData.toString());
+            config = configJson;
+            configFileUsed = defaultPath;
+        } catch (e) {
+            // No config file found.  Ingnore error
+        }
+        return config;
+    }
 
     try {
         const configFileData = fs.readFileSync(pathToFile);
         const configJson = JSON.parse(configFileData.toString());
         config = configJson;
+        configFileUsed = pathToFile;
     } catch (e) {
         console.warn('Could not read config file: ' + pathToFile);
         console.log(e.message);
@@ -168,6 +182,8 @@ export function startServer(opts: ServerInitOptions) {
     console.log(ASCII_TEXT);
 
     D_SERVER('Starting server in: ', options.serverPath);
+    D_SERVER('Using config file: %s', configFileUsed);
+    D_SERVER('Using options: %o', options);
 
     if (!serverPath) throw new Error('Invalid root path!');
 
