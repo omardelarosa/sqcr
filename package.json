@@ -17,8 +17,10 @@
     "main": "index.js",
     "scripts": {
         "test": "echo 'coming soon!'",
-        "build": "npm run build:browser && npm run build:server",
-        "build:browser": "webpack --config config/webpack.config.js",
+        "build":
+            "npm run build:worker && npm run build:browser && npm run build:server",
+        "build:browser": "webpack --config config/webpack.production.config.js",
+        "build:worker": "webpack --config config/webpack.worker.config.js",
         "build:server": "tsc -p src/server/tsconfig.json",
         "start:debug": "./sqcr-cli.js debug"
     },
@@ -53,6 +55,7 @@
         "@types/lodash": "^4.14.110",
         "@types/node": "^10.5.1",
         "@types/ws": "^5.1.2",
+        "raw-loader": "^0.5.1",
         "ts-loader": "^4.4.2",
         "webpack": "^4.14.0",
         "webpack-cli": "^3.0.8",

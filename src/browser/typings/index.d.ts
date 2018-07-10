@@ -1,5 +1,5 @@
 import { Loop } from '../Loop';
-import { BrowserClient } from '../';
+import { BrowserClient } from '../Client';
 
 declare module 'WorkerLoader.worker' {
     class WebpackWorker extends Worker {
@@ -42,6 +42,7 @@ export interface IMessage {
 
 export interface IBrowserClientOptions {
     bpm?: number;
+    useInlineWorker?: boolean;
 }
 
 export interface UnregisteredLoop {

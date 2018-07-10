@@ -9,12 +9,14 @@ import {
 
 import { Loop } from './Loop';
 import { Dispatcher } from './Dispatcher';
-import { bindTimingWorker, IWorkerGlobalScope } from './Transport';
+
+// Load as JS string for inline worker fallback
+import * as TimingWorker from '../../lib/timing.worker.js';
 
 const DEFAULT_BPM = 60;
 const DEFAULT_LOOKAHEAD_MS = 1000;
 const DEFAULT_TICK_RESOLUTION = 24;
-const DEFAULT_TIMING_WORKER_PATH = '/libbb/worker.js';
+const DEFAULT_TIMING_WORKER_PATH = '/lib/timing.worker.js';
 const EVENTS = {
     TICK: 'TICK',
     BEAT: 'BEAT',
@@ -49,12 +51,18 @@ export class BrowserClient {
     private beat: number = 0;
     private isFirstBeat: boolean = true;
     private loops: Record<string, Loop> = {};
+    private useInlineWorker: boolean = false;
     private T: number = DEFAULT_TICK_RESOLUTION;
     private M: number = 4 * DEFAULT_TICK_RESOLUTION;
 
-    constructor() {}
+    constructor(options: IBrowserClientOptions = {}) {
+        const { useInlineWorker } = options;
+        this.useInlineWorker = !!useInlineWorker;
 
-    public init(options?: IBrowserClientOptions): void {
+        this.init();
+    }
+
+    public init(): void {
         this.setAudioContext();
         this.setDispatcher();
         this.setTickInterval();
@@ -216,10 +224,11 @@ export class BrowserClient {
             console.warn('Unable to load fallback worker.');
             return;
         }
+        var blob = new Blob([TimingWorker], { type: 'text/javascript' });
 
-        const workerThread = bindTimingWorker(<any>null);
-        console.log('WORKER', bindTimingWorker);
-        // TODO: load blob worker
+        this.timerWorker = new Worker(window.URL.createObjectURL(blob));
+        this.bindTimerWorkerListeners(this.timerWorker, null);
+        this.timerWorker.postMessage('start');
     }
 
     public loadBuffer(b: string) {
@@ -286,9 +295,11 @@ export class BrowserClient {
         });
     }
 
-    public startTimerWorker(): void {
-        this.timerWorker = new Worker(BrowserClient.TIMING_WORKER_PATH);
-        this.timerWorker.onmessage = e => {
+    public bindTimerWorkerListeners(
+        timerWorker: Worker,
+        onError?: (e: ErrorEvent) => void,
+    ): void {
+        timerWorker.onmessage = e => {
             if (e.data === 'tick') {
                 this.onMessage({ address: '/midi/tick' });
             } else if (e.data && e.data.event === 'processLoops') {
@@ -299,12 +310,28 @@ export class BrowserClient {
             }
         };
 
-        this.timerWorker.onerror = err => {
-            console.log('Worker Load error!', err);
-            this.loadBlobWorker();
-        };
+        timerWorker.onerror = onError;
+    }
 
-        this.timerWorker.postMessage('start');
+    public startTimerWorker(): void {
+        if (this.useInlineWorker) {
+            this.loadBlobWorker();
+        } else {
+            this.timerWorker = new Worker(BrowserClient.TIMING_WORKER_PATH);
+
+            // Bind worker listeners and fallback to inline
+            this.bindTimerWorkerListeners(
+                this.timerWorker,
+
+                err => {
+                    // Switch to inline worker
+                    this.useInlineWorker = true;
+                    this.loadBlobWorker();
+                },
+            );
+
+            this.timerWorker.postMessage('start');
+        }
     }
 
     public startOSCListen(): void {
