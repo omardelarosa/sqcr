@@ -1,5 +1,3 @@
-import { Loop } from './Loop';
-import { Dispatcher } from './Dispatcher';
 import {
     IWindow,
     OSCEvent,
@@ -9,10 +7,14 @@ import {
     OSCPort,
 } from './typings';
 
+import { Loop } from './Loop';
+import { Dispatcher } from './Dispatcher';
+import { bindTimingWorker, IWorkerGlobalScope } from './Transport';
+
 const DEFAULT_BPM = 60;
 const DEFAULT_LOOKAHEAD_MS = 1000;
 const DEFAULT_TICK_RESOLUTION = 24;
-const DEFAULT_WORKER_PATH = '/lib/worker.js';
+const DEFAULT_TIMING_WORKER_PATH = '/libbb/worker.js';
 const EVENTS = {
     TICK: 'TICK',
     BEAT: 'BEAT',
@@ -25,10 +27,10 @@ export class BrowserClient {
     public static EVENTS = EVENTS;
     public static OSC: any; // OSC.js library ref
     public static MIDI: any; // WebMidi library ref
-    public static WORKER_PATH: string = DEFAULT_WORKER_PATH;
     public static LOOKAHEAD = DEFAULT_LOOKAHEAD_MS;
     public static USE_SERVER_CLOCK: boolean = false;
     public static DEFAULT_BPM: number = DEFAULT_BPM;
+    public static TIMING_WORKER_PATH: string = DEFAULT_TIMING_WORKER_PATH;
     public static DEFAULT_TICKS_TO_SCHEDULE: number = 100;
     public static currentBrowserBPM: number = DEFAULT_BPM;
     public static calcTickInterval = calcTickInterval;
@@ -76,13 +78,16 @@ export class BrowserClient {
     }
 
     public start(): void {
+        if (!this.hasStopped) return; // already started, prevent double starts
         this.hasStopped = false;
-        this.timerWorker.postMessage('start');
+        this.startTimerWorker();
     }
 
     public stop(): void {
+        if (this.hasStopped) return; // already stopped, prevent double stops
         this.hasStopped = true;
         this.timerWorker.postMessage('stop');
+        this.timerWorker.terminate();
     }
 
     // EVENT HANDLERS
@@ -206,6 +211,17 @@ export class BrowserClient {
         }, 100);
     };
 
+    public loadBlobWorker() {
+        if (typeof Blob === 'undefined') {
+            console.warn('Unable to load fallback worker.');
+            return;
+        }
+
+        const workerThread = bindTimingWorker(<any>null);
+        console.log('WORKER', bindTimingWorker);
+        // TODO: load blob worker
+    }
+
     public loadBuffer(b: string) {
         const $buffers = document.querySelectorAll('.buffer-script');
         Array.from($buffers).forEach(b => b.remove());
@@ -271,7 +287,7 @@ export class BrowserClient {
     }
 
     public startTimerWorker(): void {
-        this.timerWorker = new Worker(BrowserClient.WORKER_PATH);
+        this.timerWorker = new Worker(BrowserClient.TIMING_WORKER_PATH);
         this.timerWorker.onmessage = e => {
             if (e.data === 'tick') {
                 this.onMessage({ address: '/midi/tick' });
@@ -281,6 +297,11 @@ export class BrowserClient {
             } else {
                 console.log('message', e.data);
             }
+        };
+
+        this.timerWorker.onerror = err => {
+            console.log('Worker Load error!', err);
+            this.loadBlobWorker();
         };
 
         this.timerWorker.postMessage('start');
@@ -306,6 +327,10 @@ export class BrowserClient {
     }
 
     public setupMIDI(): void {
+        if (!BrowserClient.MIDI) {
+            console.warn('No MIDI adaptor provided, MIDI support disabled.');
+            return;
+        }
         // MIDI Testing
         BrowserClient.MIDI.enable(function(err) {
             if (err) {
@@ -317,6 +342,9 @@ export class BrowserClient {
     }
 
     public getOutputs = (): any => {
+        if (!BrowserClient.MIDI) {
+            return [];
+        }
         // MIDI Testing
         BrowserClient.MIDI.enable(function(err) {
             if (err) {
@@ -350,3 +378,5 @@ export class BrowserClient {
         WINDOW.BrowserClient = BrowserClient;
     }
 }
+
+export default BrowserClient;

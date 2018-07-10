@@ -1,6 +1,14 @@
 import { Loop } from '../Loop';
 import { BrowserClient } from '../';
 
+declare module 'WorkerLoader.worker' {
+    class WebpackWorker extends Worker {
+        constructor();
+    }
+
+    export default WebpackWorker;
+}
+
 export interface IWindow extends Window {
     BrowserClient: any;
     sqcr: any;

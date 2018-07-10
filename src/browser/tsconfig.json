@@ -4,7 +4,7 @@
         "target": "es6",
         "module": "commonjs",
         "lib": ["dom", "es7"],
+        "typeRoots": ["node_modules/@types", "./typings/**/*"],
         "outDir": "../../lib"
-    },
-    "files": ["index.ts"]
+    }
 }

@@ -1,24 +1,14 @@
 const path = require('path');
 const tsConfig = require('../src/browser/tsconfig.json');
 
-module.exports = {
+const baseConfig = {
     mode: 'production',
-    entry: './src/browser/loader.ts',
-    output: {
-        path: path.resolve(__dirname, '../lib'),
-        filename: 'browser.js',
-    },
     resolve: {
         // Add `.ts` and `.tsx` as a resolvable extension.
         extensions: ['.ts', '.tsx', '.js'],
     },
-    externals: {
-        osc: 'osc',
-        'web-midi': 'WebMidi',
-    },
     module: {
         rules: [
-            // all files with a `.ts` or `.tsx` extension will be handled by `ts-loader`
             {
                 test: /\.tsx?$/,
                 loader: 'ts-loader',
@@ -26,3 +16,31 @@ module.exports = {
         ],
     },
 };
+
+module.exports = [
+    // Configure browser client
+    {
+        ...baseConfig,
+        entry: './src/browser/Client.ts',
+        output: {
+            path: path.resolve(__dirname, '../lib'),
+            filename: 'browser.js',
+            libraryExport: 'default',
+            library: 'SQCR',
+        },
+        externals: {
+            osc: 'osc',
+            'web-midi': 'WebMidi',
+        },
+    },
+    // Configure webworker
+    {
+        ...baseConfig,
+        entry: './src/browser/Timing.worker.ts',
+        target: 'webworker',
+        output: {
+            path: path.resolve(__dirname, '../lib'),
+            filename: 'worker.js',
+        },
+    },
+];
