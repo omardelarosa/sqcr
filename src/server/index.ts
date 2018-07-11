@@ -4,7 +4,8 @@ import * as WebSocket from 'ws';
 import * as fs from 'fs';
 import { isEmpty } from 'lodash';
 
-import { exampleTemplate } from '../templates/example.html';
+import { rootRenderer, Renderer } from './renderer';
+import defaultTemplate from '../templates/default.html';
 import { ASCII_TEXT } from '../templates/ascii';
 
 // Non-TS modules
@@ -112,6 +113,7 @@ interface ServerOptions {
     libs: string[];
     serverPath: string;
     port: number;
+    rendererPath?: string;
 }
 
 type ConfigFile = Partial<ServerOptions>;
@@ -146,6 +148,29 @@ const loadConfig = (pathToFile: string): ConfigFile => {
     return config;
 };
 
+const loadRenderer = (pathToFile: string): Renderer => {
+    let renderer = defaultTemplate;
+    if (!pathToFile) {
+        // Silently use default renderer when no other is provided.
+        return renderer;
+    }
+
+    try {
+        renderer = require(path.join(process.cwd(), pathToFile));
+        if (!renderer || typeof renderer !== 'function') {
+            throw new Error(
+                `Render file ${pathToFile} does not export a function.`,
+            );
+        }
+    } catch (e) {
+        console.warn('Could not read renderer from config file!');
+        console.log(e.message);
+        console.log(e.stack);
+    }
+
+    return renderer;
+};
+
 interface ServerInitOptions {
     port: number;
     serverPath?: string;
@@ -169,6 +194,7 @@ export function startServer(opts: ServerInitOptions) {
 
     const b = buffers || 'public/_buffers';
     const config = loadConfig(configPath);
+    const renderer = loadRenderer(config.rendererPath);
     const SERVER_PATH = path.resolve(config.serverPath || serverPath);
     const BUFFERS_LOCATION = path.join(SERVER_PATH, b);
     const USE_SERVER_CLOCK = useServerClock;
@@ -237,13 +263,14 @@ export function startServer(opts: ServerInitOptions) {
     app.get('/', (req, res) => {
         const libs = options.libs || DEFAULT_LIBS;
         res.send(
-            exampleTemplate(
+            rootRenderer(
                 {
                     BUFFER_PATH: b,
                     USE_SERVER_CLOCK,
                     ASCII_TEXT,
                 },
                 libs,
+                renderer,
             ),
         );
     });

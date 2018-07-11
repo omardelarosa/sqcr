@@ -60,6 +60,10 @@ export class BrowserClient {
         this.setGlobals(<IWindow>window);
     }
 
+    public tickToMS() {
+        return this.transport.tickToMS();
+    }
+
     public setTransport() {
         this.transport = new Transport({ bpm: Transport.DEFAULT_BPM });
         this.transport.events.on(EVENTS.TICK, this.onTick);

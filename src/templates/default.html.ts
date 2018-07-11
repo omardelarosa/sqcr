@@ -1,18 +1,5 @@
-interface TemplateLocals {
-    BUFFER_PATH?: string;
-    USE_SERVER_CLOCK?: boolean;
-    ASCII_TEXT?: string;
-}
-
-type ScriptPaths = string[];
-
-export const exampleTemplate = (
-    locals: TemplateLocals = {},
-    scripts: ScriptPaths = [],
-) => {
-    const scriptTags = scripts.map(sPath => `<script src="${sPath}"></script>`);
-
-    return `
+export const defaultTemplate = (locals, scripts, scriptTags) =>
+    `
     <!DOCTYPE html>
     <html>
         <head>
@@ -35,5 +22,6 @@ ${locals.ASCII_TEXT}
         </div>
         </body>
     </html>
-`;
-};
+    `;
+
+export default defaultTemplate;

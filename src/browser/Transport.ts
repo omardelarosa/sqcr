@@ -220,6 +220,7 @@ export class Transport {
     public static DEFAULT_TICK_RESOLUTION = DEFAULT_TICK_RESOLUTION;
     public static DEFAULT_LOOKAHEAD_MS = DEFAULT_LOOKAHEAD_MS;
     public static DEFAULT_BPM = DEFAULT_BPM;
+    // Utils
     public events: EventEmitter = null;
     private timerWorker: Worker;
     private beat: number = 0;
@@ -229,6 +230,11 @@ export class Transport {
     constructor(options: ITransportOptions = {}) {
         this.events = new EventEmitter();
         this.bpm = options.bpm;
+    }
+
+    // Useful for debugging
+    public tickToMS() {
+        return calcTickInterval(this.bpm);
     }
 
     public getTick(): number {
