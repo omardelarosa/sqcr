@@ -18,6 +18,8 @@ const EVENTS = {
     STOP: 'STOP',
     START: 'START',
     UPDATE_BPM: 'UPDATE_BPM',
+    OSC: 'OSC',
+    MIDI: 'MIDI',
 };
 
 export interface IWorkerGlobalScope {
@@ -34,6 +36,7 @@ type WorkerEventName =
     | 'start'
     | 'stop'
     | 'processLoops'
+    | 'osc'
     | 'updateBPM';
 
 type WorkerEventParams =
@@ -57,6 +60,7 @@ export type TransportActions =
     | 'tick'
     | 'start'
     | 'stop'
+    | 'osc'
     | 'updateBPM';
 
 export interface WorkerEvent {
@@ -117,7 +121,7 @@ class TimingManager {
     public setBPM({ bpm }) {
         this.bpm = bpm;
         this.interval = calcTickInterval(bpm);
-        console.log('setBPM', this.bpm, 'interval', this.interval);
+        // console.log('setBPM', this.bpm, 'interval', this.interval);
     }
 
     private updateInterval({ bpm }) {
@@ -135,12 +139,12 @@ class TimingManager {
 
     private start({ bpm }) {
         // TODO: put this behind a debug flag
-        console.log('starting at BPM: ', bpm);
+        // console.log('starting at BPM: ', bpm);
         this.updateInterval({ bpm });
     }
 
     private stop() {
-        console.log('stopping');
+        // console.log('stopping');
         this.clearScheduledTicks();
     }
 
@@ -269,13 +273,6 @@ export class Transport {
         const EVENTS = Transport.EVENTS;
         const evtName = evt.name || evt.data.action;
         switch (evtName) {
-            case 'buffer':
-                console.log('loop change detected');
-                this.events.emit(EVENTS.BUFFER, {
-                    adress: evt.address,
-                    payload: evt.data.payload,
-                });
-                break;
             case 'beat':
                 this.incrementBeat();
                 this.events.emit(EVENTS.BEAT, evt.data.payload);
@@ -295,6 +292,8 @@ export class Transport {
                 this.start(evt.data.payload);
                 this.events.emit(EVENTS.START, evt.data.payload);
                 break;
+            case 'osc':
+                this.receiveOSC(evt.data.payload);
             case 'stop':
                 this.stop();
                 this.events.emit(EVENTS.STOP, evt.data.payload);
@@ -343,6 +342,11 @@ export class Transport {
 
     public updateBPM(bpm) {
         this.sendToWorker('updateInterval', { bpm });
+    }
+
+    public receiveOSC({ message }) {
+        // TODO: handle OSC here
+        // console.log('OSC', Transport.toEvent(message), message);
     }
 }
 

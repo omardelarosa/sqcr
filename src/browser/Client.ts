@@ -26,14 +26,13 @@ export class BrowserClient {
     public static TIMING_WORKER_PATH: string = DEFAULT_TIMING_WORKER_PATH;
     public static DEFAULT_TICKS_TO_SCHEDULE: number = 100;
     public static currentBrowserBPM: number = Transport.DEFAULT_BPM;
+    public static DEBUG: boolean = false;
     public lastTick: number = Date.now();
     public timerWorker: Worker = null;
 
     private oscillator: OscillatorNode = null;
     private context: AudioContext;
     private lastScheduledTickTimestamp: number = Date.now();
-    // private tickInterval: number;
-    // private pendingTicks: Set<number> = new Set();
     private hasStopped: boolean = true; // Initializes in a stopped state
     private transport: Transport;
     private bufferQueue: string[] = [];
@@ -103,7 +102,9 @@ export class BrowserClient {
         const t = this.transport.getTick();
         const since = Date.now() - this.lastTick;
         this.lastTick = Date.now();
-        console.log('tick', t, since);
+        if (BrowserClient.DEBUG) {
+            console.log('tick', t, since);
+        }
         this.processLoops(t);
         if (t % Transport.DEFAULT_TICK_RESOLUTION === 0) {
             this.onBeat();
@@ -122,6 +123,7 @@ export class BrowserClient {
             this.isFirstBeat = false;
         }
 
+        this.processBuffers();
         this.drainRegisterLoopQueue();
     };
 
@@ -148,15 +150,7 @@ export class BrowserClient {
 
     public setTempo = bpm => {
         if (!BrowserClient.USE_SERVER_CLOCK) {
-            // console.log('using browser clock!');
             this.sendToTransport('updateBPM', { bpm });
-            // BrowserClient.currentBrowserBPM = bpm;
-            // this.timerWorker.postMessage({
-            //     action: 'updateInterval',
-            //     payload: {
-            //         bpm,
-            //     },
-            // });
             return;
         }
 
@@ -200,7 +194,9 @@ export class BrowserClient {
     public processLoops(t: number) {
         // Limit duration of this invokation with timeout to preserve time
         Object.keys(this.loops).forEach(loopName => {
-            console.log('processing loop', loopName, t);
+            if (BrowserClient.DEBUG) {
+                console.log('processing loop', loopName, t);
+            }
             this.loops[loopName].run(t);
         });
     }
@@ -211,21 +207,30 @@ export class BrowserClient {
         }
     }
 
+    // TODO: move this to the transport layer
     public startOSCListen(): void {
-        // if (!BrowserClient.OSC) {
-        //     console.warn(
-        //         'OSC Browser client not found!  Will not observe file changes.',
-        //     );
-        //     return;
-        // }
-        // // Init container
-        // let oscPort: OSCPort = new BrowserClient.OSC.WebSocketPort({
-        //     url: `ws://${window.location.host}`,
-        // });
-        // // listen
-        // oscPort.on('message', this.onMessage);
-        // // open port
-        // oscPort.open();
+        if (!BrowserClient.OSC) {
+            console.warn(
+                'OSC Browser client not found!  Will not observe file changes.',
+            );
+            return;
+        }
+        // Init container
+        let oscPort: OSCPort = new BrowserClient.OSC.WebSocketPort({
+            url: `ws://${window.location.host}`,
+        });
+        // listen
+        oscPort.on('message', msg => {
+            const evt = Transport.toEvent(msg);
+            const address = evt.data.address;
+            const bufferSrc = address
+                .split('/')
+                .slice(2)
+                .join('/');
+            this.bufferQueue.push(bufferSrc);
+        });
+        // open port
+        oscPort.open();
     }
 
     public startTimerWorker(): void {

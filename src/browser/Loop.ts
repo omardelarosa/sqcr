@@ -6,8 +6,6 @@ export class Loop {
     private tick: number;
     private isDead: boolean;
     private tickToAwake: number;
-    // private ticksToSleep: number = -1;
-    // private lastTickCalled: number = -1;
 
     constructor({ handler, name }) {
         this.handler = handler.bind(this);
@@ -37,11 +35,5 @@ export class Loop {
         if (!this.isSleeping && !this.isDead) {
             this.handler(this);
         }
-
-        // // Only call if not sleeping, not dead and has not been called this tick
-        // if (!this.isSleeping && !this.isDead && this.lastTickCalled !== t) {
-        //     this.lastTickCalled = t;
-        //     this.handler(this);
-        // }
     }
 }
