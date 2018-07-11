@@ -2,12 +2,13 @@ import { EventEmitter } from './EventEmitter';
 
 import { OSCEvent } from './typings';
 
-const DEFAULT_TICK_RESOLUTION = 24;
+const DEFAULT_TICK_RESOLUTION = 48;
+const DEFAULT_TICKS_TO_SCHEDULE = 100;
 const DEFAULT_BPM = 60;
 const DEFAULT_LOOKAHEAD_MS = 1000;
 const DEFAULT_TIMING_WORKER_PATH = '/lib/timing.worker.js';
-const calcTickInterval = (bpm: number) =>
-    (60 * 1000) / bpm / DEFAULT_TICK_RESOLUTION;
+const calcTickInterval = (bpm: number): number =>
+    Math.round((60 * 1000) / bpm / DEFAULT_TICK_RESOLUTION);
 
 const EVENTS = {
     TICK: 'TICK',
@@ -68,16 +69,19 @@ export interface WorkerEvent {
 }
 
 class TimingManager {
+    public static DEFAULT_TICK_RESOLUTION = DEFAULT_TICK_RESOLUTION;
+    public static DEFAULT_LOOKAHEAD_MS = DEFAULT_LOOKAHEAD_MS;
+    public static DEFAULT_TICKS_TO_SCHEDULE = DEFAULT_TICKS_TO_SCHEDULE;
+    public tick: number = 0;
+    public lastTickSent: number = -1;
     public timerID: number;
-    public interval: number;
+    public interval: number = calcTickInterval(DEFAULT_BPM); // 60 BPM default
     public scheduledTicks: Set<number>;
-    private bpm: number;
+    private bpm: number = DEFAULT_BPM; // 60 bpm default
     private ctx: IWorkerGlobalScope;
 
-    constructor(bpm: number, ctx: IWorkerGlobalScope) {
-        this.bpm = bpm;
+    constructor(ctx: IWorkerGlobalScope) {
         this.timerID = 0;
-        this.setBPM({ bpm });
         this.scheduledTicks = new Set();
         this.ctx = ctx;
     }
@@ -111,16 +115,18 @@ class TimingManager {
     }
 
     public setBPM({ bpm }) {
+        this.bpm = bpm;
         this.interval = calcTickInterval(bpm);
+        console.log('setBPM', this.bpm, 'interval', this.interval);
     }
 
     private updateInterval({ bpm }) {
-        clearInterval(this.timerID);
-        this.setBPM(bpm);
+        this.clearScheduledTicks();
+        this.setBPM({ bpm });
 
         // Schedules ticks on each beat
-        const schedulingFrequency = DEFAULT_TICK_RESOLUTION * this.interval;
-
+        const schedulingFrequency =
+            TimingManager.DEFAULT_TICK_RESOLUTION * this.interval;
         this.timerID = setInterval(() => {
             // Schedules all ticks for the next period
             this.scheduleTicks();
@@ -135,10 +141,11 @@ class TimingManager {
 
     private stop() {
         console.log('stopping');
-        let i = 0;
-        // Clear schedule
+        this.clearScheduledTicks();
+    }
+
+    private clearScheduledTicks() {
         this.scheduledTicks.forEach(t => {
-            i++;
             clearTimeout(t);
             this.scheduledTicks.delete(t);
         });
@@ -146,23 +153,35 @@ class TimingManager {
         this.timerID = 0;
     }
 
-    private scheduleTicks() {
-        let tick = 1;
+    private incrementTick() {
+        this.tick++;
+    }
+
+    private getTick() {
+        return this.tick;
+    }
+
+    private scheduleTicks = () => {
+        let i = 1;
         let amountScheduled = 0;
-        while (amountScheduled < DEFAULT_LOOKAHEAD_MS) {
-            const timeUntilTick = tick * this.interval;
-            let timer = setTimeout(() => {
-                // Check if a timer has already been scheduled for this tick
-                if (!this.scheduledTicks.has(timer)) return;
-                // Emits a 'tick' event for the transport layer
-                this.sendToTransport('tick');
-                this.scheduledTicks.delete(timer);
-            }, timeUntilTick);
-            this.scheduledTicks.add(timer);
-            tick++;
+        while (i < TimingManager.DEFAULT_TICKS_TO_SCHEDULE) {
+            const timeUntilTick = i * this.interval;
+            const tickToSchedule = this.getTick() + i;
+            // Check if a timer has already been scheduled for this tick
+            if (this.scheduledTicks.has(tickToSchedule)) {
+                // do not reschedule
+            } else {
+                let timer = setTimeout(() => {
+                    this.sendToTransport('tick');
+                    this.incrementTick();
+                    this.scheduledTicks.delete(tickToSchedule);
+                }, timeUntilTick);
+                this.scheduledTicks.add(tickToSchedule);
+            }
+            i++;
             amountScheduled += timeUntilTick;
         }
-    }
+    };
 
     public sendToTransport(action: TransportActions, payload?: any) {
         this.ctx.postMessage({ action, payload });
@@ -172,7 +191,7 @@ class TimingManager {
 export const bindTimingWorkerOnMessageHandler = (
     self: IWorkerGlobalScope,
 ): ((e: WorkerEvent) => void) => {
-    const timing = new TimingManager(DEFAULT_BPM, self);
+    const timing = new TimingManager(self);
     return (e: WorkerEvent) => {
         try {
             timing.onEvent(e);

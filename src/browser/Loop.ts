@@ -5,8 +5,9 @@ export class Loop {
     private isSleeping: boolean = false;
     private tick: number;
     private isDead: boolean;
-    private ticksToSleep: number = -1;
-    private lastTickCalled: number = -1;
+    private tickToAwake: number;
+    // private ticksToSleep: number = -1;
+    // private lastTickCalled: number = -1;
 
     constructor({ handler, name }) {
         this.handler = handler.bind(this);
@@ -15,8 +16,8 @@ export class Loop {
     }
 
     public sleep(amount): Promise<any> {
-        this.ticksToSleep = amount;
         this.isSleeping = true;
+        this.tickToAwake = this.tick + amount;
         return new Promise((resolve, reject) => {});
     }
 
@@ -27,16 +28,20 @@ export class Loop {
 
     run(t: number): void {
         this.tick = t;
-        // Decrementer must be at the begging to account for 0th tick in sleep cycle
-        this.ticksToSleep--;
-        if (this.ticksToSleep <= 0) {
+
+        if (this.isSleeping && this.tick === this.tickToAwake) {
             this.isSleeping = false;
+            this.tickToAwake = null;
         }
 
-        // Only call if not sleeping, not dead and has not been called this tick
-        if (!this.isSleeping && !this.isDead && this.lastTickCalled !== t) {
-            this.lastTickCalled = t;
+        if (!this.isSleeping && !this.isDead) {
             this.handler(this);
         }
+
+        // // Only call if not sleeping, not dead and has not been called this tick
+        // if (!this.isSleeping && !this.isDead && this.lastTickCalled !== t) {
+        //     this.lastTickCalled = t;
+        //     this.handler(this);
+        // }
     }
 }
