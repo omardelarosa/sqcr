@@ -17,8 +17,7 @@
     "main": "index.js",
     "scripts": {
         "test": "echo 'coming soon!'",
-        "build":
-            "npm run build:worker && npm run build:browser && npm run build:server",
+        "build": "npm run build:worker && npm run build:browser && npm run build:server",
         "build:browser": "webpack --config config/webpack.production.config.js",
         "build:worker": "webpack --config config/webpack.worker.config.js",
         "build:server": "tsc -p src/server/tsconfig.json",

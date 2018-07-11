@@ -1,7 +1,10 @@
-import { bindTimingWorker, IWorkerGlobalScope } from '../browser/Transport';
+import {
+    bindTimingWorkerOnMessageHandler,
+    IWorkerGlobalScope,
+} from '../browser/Transport';
 
 const ctx: any = <any>self;
 
-ctx.onmessage = bindTimingWorker(ctx);
+ctx.onmessage = bindTimingWorkerOnMessageHandler(ctx);
 
-ctx.postMessage('worker online!');
+// ctx.postMessage('TimingWorker online!');

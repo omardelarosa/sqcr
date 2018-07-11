@@ -1,79 +1,70 @@
 import {
     IWindow,
-    OSCEvent,
-    WorkerEvent,
     IBrowserClientOptions,
     UnregisteredLoop,
     OSCPort,
 } from './typings';
 
+import { Transport, TransportActions } from './Transport';
 import { Loop } from './Loop';
-import { Dispatcher } from './Dispatcher';
 
 // Load as JS string for inline worker fallback
 import * as TimingWorker from '../../lib/timing.worker.js';
 
-const DEFAULT_BPM = 60;
-const DEFAULT_LOOKAHEAD_MS = 1000;
-const DEFAULT_TICK_RESOLUTION = 24;
 const DEFAULT_TIMING_WORKER_PATH = '/lib/timing.worker.js';
-const EVENTS = {
-    TICK: 'TICK',
-    BEAT: 'BEAT',
-};
-
-const calcTickInterval = (bpm: number) =>
-    (60 * 1000) / bpm / DEFAULT_TICK_RESOLUTION;
+const EVENTS = Transport.EVENTS;
 
 export class BrowserClient {
+    public static Transport = Transport;
     public static EVENTS = EVENTS;
     public static OSC: any; // OSC.js library ref
     public static MIDI: any; // WebMidi library ref
-    public static LOOKAHEAD = DEFAULT_LOOKAHEAD_MS;
+    public static LOOKAHEAD = Transport.DEFAULT_LOOKAHEAD_MS;
     public static USE_SERVER_CLOCK: boolean = false;
-    public static DEFAULT_BPM: number = DEFAULT_BPM;
+    public static DEFAULT_BPM: number = Transport.DEFAULT_BPM;
+    public static DEFAULT_LOOKAHEAD_MS = Transport.DEFAULT_LOOKAHEAD_MS;
     public static TIMING_WORKER_PATH: string = DEFAULT_TIMING_WORKER_PATH;
     public static DEFAULT_TICKS_TO_SCHEDULE: number = 100;
-    public static currentBrowserBPM: number = DEFAULT_BPM;
-    public static calcTickInterval = calcTickInterval;
+    public static currentBrowserBPM: number = Transport.DEFAULT_BPM;
     public timerWorker: Worker = null;
 
     private oscillator: OscillatorNode = null;
     private context: AudioContext;
     private lastScheduledTickTimestamp: number = Date.now();
-    private tickInterval: number;
+    // private tickInterval: number;
     private pendingTicks: Set<number> = new Set();
     private hasStopped: boolean = false;
-    private dispatcher: Dispatcher = null;
+    private transport: Transport;
     private bufferQueue: string[] = [];
     private newLoopsQueue: UnregisteredLoop[] = []; // TODO: remove any
+    private bpm: number;
     private tick: number = 0;
     private beat: number = 0;
     private isFirstBeat: boolean = true;
     private loops: Record<string, Loop> = {};
     private useInlineWorker: boolean = false;
-    private T: number = DEFAULT_TICK_RESOLUTION;
-    private M: number = 4 * DEFAULT_TICK_RESOLUTION;
+    private T: number = Transport.DEFAULT_TICK_RESOLUTION;
+    private M: number = 4 * Transport.DEFAULT_TICK_RESOLUTION;
 
     constructor(options: IBrowserClientOptions = {}) {
         const { useInlineWorker } = options;
         this.useInlineWorker = !!useInlineWorker;
-
+        // TODO: perhaps don't init on constructor?
         this.init();
     }
 
     public init(): void {
+        this.setTransport();
         this.setAudioContext();
-        this.setDispatcher();
-        this.setTickInterval();
         this.startClock();
         this.setGlobals(<IWindow>window);
     }
 
-    public setDispatcher(D = Dispatcher) {
-        this.dispatcher = new D();
-        this.dispatcher.addEventListener(EVENTS.TICK, this.onTick);
-        this.dispatcher.addEventListener(EVENTS.BEAT, this.onBeat);
+    public setTransport() {
+        this.transport = new Transport({ bpm: Transport.DEFAULT_BPM });
+        this.transport.events.on(EVENTS.TICK, this.onTick);
+        // this.transport.events.on(EVENTS.BEAT, this.onBeat);
+        this.bpm = this.transport.getBPM();
     }
 
     public setAudioContext(AC = AudioContext): void {
@@ -81,20 +72,18 @@ export class BrowserClient {
         this.context = new AC();
     }
 
-    public setTickInterval(bpm = DEFAULT_BPM): void {
-        this.tickInterval = BrowserClient.calcTickInterval(bpm);
-    }
+    public sendToTransport(action: TransportActions, payload: any) {}
 
     public start(): void {
         if (!this.hasStopped) return; // already started, prevent double starts
         this.hasStopped = false;
-        this.startTimerWorker();
+        this.sendToTransport('start', { bpm: this.bpm });
     }
 
     public stop(): void {
         if (this.hasStopped) return; // already stopped, prevent double stops
         this.hasStopped = true;
-        this.timerWorker.postMessage('stop');
+        this.timerWorker.postMessage({ action: 'stop' });
         this.timerWorker.terminate();
     }
 
@@ -102,11 +91,12 @@ export class BrowserClient {
 
     // aka handleTick
     public onTick = (ev: Event): void => {
-        this.incrementTicks();
-        this.scheduleTicks(
-            BrowserClient.DEFAULT_TICKS_TO_SCHEDULE,
-            this.getCurrentTick(),
-        );
+        const t = this.transport.getTick();
+        console.log('tick', t);
+        // this.processLoops(t);
+        // if (t % Transport.DEFAULT_TICK_RESOLUTION === 0) {
+        //     this.onBeat();
+        // }
     };
 
     public onFirstBeat = (ev: Event): void => {
@@ -114,7 +104,7 @@ export class BrowserClient {
     };
 
     // aka handleBeat
-    public onBeat = (ev: Event): void => {
+    public onBeat = (ev?: Event): void => {
         // Init callback
         if (this.isFirstBeat) {
             this.onFirstBeat(ev);
@@ -123,43 +113,6 @@ export class BrowserClient {
 
         this.drainRegisterLoopQueue();
     };
-
-    // Process Events -- TODO: type-annotation OSC.js
-    public onMessage = (msg: WorkerEvent | OSCEvent): void => {
-        // console.log('message', msg);
-        const address = msg.address || '';
-        // Message type 1
-        const msgParts: string[] = address.split('/');
-        if (msgParts[1] === 'buffer') {
-            // slow
-            console.log('loop change detected');
-            this.bufferQueue.push(msgParts.slice(2).join('/'));
-        }
-
-        // Message type 2
-        if (msgParts[1] === 'midi') {
-            if (msgParts[2] === 'beat' || this.tick % 24 === 0) {
-                this.beat++;
-                const evt = new CustomEvent(EVENTS.BEAT, {});
-                this.dispatcher.dispatchEvent(evt);
-            }
-
-            if (msgParts[2] === 'tick') {
-                const evt = new CustomEvent(EVENTS.TICK, {});
-                this.dispatcher.dispatchEvent(evt);
-            }
-        }
-    };
-
-    // UTILITIES
-    public incrementTicks(): void {
-        this.tick++;
-    }
-
-    public getCurrentTick(): number {
-        // NOTE: this must not return a reference
-        return Number(this.tick);
-    }
 
     public drainRegisterLoopQueue(): void {
         while (this.newLoopsQueue.length > 0) {
@@ -184,12 +137,15 @@ export class BrowserClient {
 
     public setTempo = bpm => {
         if (!BrowserClient.USE_SERVER_CLOCK) {
-            console.log('using browser clock!');
-            BrowserClient.currentBrowserBPM = bpm;
-            this.tickInterval = calcTickInterval(bpm);
-            this.timerWorker.postMessage({
-                interval: this.tickInterval,
-            });
+            this.sendToTransport('updateBPM', { bpm });
+            // console.log('using browser clock!');
+            // BrowserClient.currentBrowserBPM = bpm;
+            // this.timerWorker.postMessage({
+            //     action: 'updateInterval',
+            //     payload: {
+            //         bpm,
+            //     },
+            // });
             return;
         }
 
@@ -219,18 +175,6 @@ export class BrowserClient {
         }, 100);
     };
 
-    public loadBlobWorker() {
-        if (typeof Blob === 'undefined') {
-            console.warn('Unable to load fallback worker.');
-            return;
-        }
-        var blob = new Blob([TimingWorker], { type: 'text/javascript' });
-
-        this.timerWorker = new Worker(window.URL.createObjectURL(blob));
-        this.bindTimerWorkerListeners(this.timerWorker, null);
-        this.timerWorker.postMessage('start');
-    }
-
     public loadBuffer(b: string) {
         const $buffers = document.querySelectorAll('.buffer-script');
         Array.from($buffers).forEach(b => b.remove());
@@ -259,113 +203,56 @@ export class BrowserClient {
         }
     }
 
-    public scheduleTicks(numTicks: number, currentTick: number): void {
-        const lastScheduled = this.lastScheduledTickTimestamp;
-        const now = Date.now();
-        const since = now - lastScheduled;
-        if (since > BrowserClient.LOOKAHEAD) {
-            if (this.hasStopped) return;
-            // const ticksToSchedule = parseInt(BrowserClient.LOOKAHEAD / this.tickInterval);
-            const ticksToSchedule = numTicks;
-            let i = 0;
-            while (i <= ticksToSchedule + 1) {
-                let t = currentTick;
-                let s = t + i;
-                if (this.pendingTicks.has(s)) {
-                    i++;
-                    // Do not schedule...
-                    continue;
-                }
-                this.scheduleTick(s, i);
-                i++;
-            }
-            // Once per "cycle", more CPU heavy
-            this.processBuffers();
-            this.lastScheduledTickTimestamp = now;
-        }
-    }
-
-    public scheduleTick(t: number, queueRank: number): void {
-        this.pendingTicks.add(t);
-        this.timerWorker.postMessage({
-            scheduleLoop: true,
-            tickID: t,
-            queueRank,
-            tickInterval: this.tickInterval,
-        });
-    }
-
-    public bindTimerWorkerListeners(
-        timerWorker: Worker,
-        onError?: (e: ErrorEvent) => void,
-    ): void {
-        timerWorker.onmessage = e => {
-            if (e.data === 'tick') {
-                this.onMessage({ address: '/midi/tick' });
-            } else if (e.data && e.data.event === 'processLoops') {
-                const { tick: tickToProcess } = e.data;
-                this.processLoops(tickToProcess);
-            } else {
-                console.log('message', e.data);
-            }
-        };
-
-        timerWorker.onerror = onError;
+    public startOSCListen(): void {
+        // if (!BrowserClient.OSC) {
+        //     console.warn(
+        //         'OSC Browser client not found!  Will not observe file changes.',
+        //     );
+        //     return;
+        // }
+        // // Init container
+        // let oscPort: OSCPort = new BrowserClient.OSC.WebSocketPort({
+        //     url: `ws://${window.location.host}`,
+        // });
+        // // listen
+        // oscPort.on('message', this.onMessage);
+        // // open port
+        // oscPort.open();
     }
 
     public startTimerWorker(): void {
         if (this.useInlineWorker) {
-            this.loadBlobWorker();
+            this.transport.startTimerWorker(this.makeBlobWorker());
         } else {
-            this.timerWorker = new Worker(BrowserClient.TIMING_WORKER_PATH);
-
-            // Bind worker listeners and fallback to inline
-            this.bindTimerWorkerListeners(
-                this.timerWorker,
-
-                err => {
-                    // Switch to inline worker
-                    this.useInlineWorker = true;
-                    this.loadBlobWorker();
-                },
+            this.transport.startTimerWorker(
+                new Worker(BrowserClient.TIMING_WORKER_PATH),
             );
-
-            this.timerWorker.postMessage('start');
         }
     }
 
-    public startOSCListen(): void {
-        if (!BrowserClient.OSC) {
-            console.warn(
-                'OSC Browser client not found!  Will not observer file changes.',
-            );
+    public makeBlobWorker() {
+        if (typeof Blob === 'undefined') {
+            console.warn('Unable to load fallback worker.');
             return;
         }
-        // Init container
-        let oscPort: OSCPort = new BrowserClient.OSC.WebSocketPort({
-            url: `ws://${window.location.host}`,
-        });
+        var blob = new Blob([TimingWorker], { type: 'text/javascript' });
 
-        // listen
-        oscPort.on('message', this.onMessage);
-
-        // open port
-        oscPort.open();
+        return new Worker(window.URL.createObjectURL(blob));
     }
 
     public setupMIDI(): void {
-        if (!BrowserClient.MIDI) {
-            console.warn('No MIDI adaptor provided, MIDI support disabled.');
-            return;
-        }
-        // MIDI Testing
-        BrowserClient.MIDI.enable(function(err) {
-            if (err) {
-                console.log('WebMidi could not be enabled.', err);
-            } else {
-                console.log('WebMidi enabled!');
-            }
-        });
+        // if (!BrowserClient.MIDI) {
+        //     console.warn('No MIDI adaptor provided, MIDI support disabled.');
+        //     return;
+        // }
+        // // MIDI Testing
+        // BrowserClient.MIDI.enable(function(err) {
+        //     if (err) {
+        //         console.log('WebMidi could not be enabled.', err);
+        //     } else {
+        //         console.log('WebMidi enabled!');
+        //     }
+        // });
     }
 
     public getOutputs = (): any => {
@@ -398,7 +285,7 @@ export class BrowserClient {
         WINDOW.loop = this.registerLoop;
         WINDOW.setTempo = this.setTempo;
         WINDOW.playNote = this.playNote;
-        WINDOW.tickInterval = this.tickInterval;
+        // WINDOW.tickInterval = this.tickInterval;
         WINDOW.T = this.T;
         WINDOW.M = this.M;
         WINDOW.sqcr = this; // exposes API as global
