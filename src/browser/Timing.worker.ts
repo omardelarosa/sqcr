@@ -6,5 +6,3 @@ import {
 const ctx: any = <any>self;
 
 ctx.onmessage = bindTimingWorkerOnMessageHandler(ctx);
-
-// ctx.postMessage('TimingWorker online!');

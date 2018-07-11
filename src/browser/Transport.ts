@@ -14,6 +14,9 @@ const EVENTS = {
     BEAT: 'BEAT',
     BUFFER: 'BUFFER',
     PROCESS_LOOPS: 'PROCESS_LOOPS',
+    STOP: 'STOP',
+    START: 'START',
+    UPDATE_BPM: 'UPDATE_BPM',
 };
 
 export interface IWorkerGlobalScope {
@@ -21,7 +24,16 @@ export interface IWorkerGlobalScope {
     postMessage: (e: any) => void;
 }
 
-type WorkerEventName = 'midi' | 'tick' | 'buffer' | 'beat' | 'processLoops';
+// TODO: split into worker and client events
+type WorkerEventName =
+    | 'midi'
+    | 'tick'
+    | 'buffer'
+    | 'beat'
+    | 'start'
+    | 'stop'
+    | 'processLoops'
+    | 'updateBPM';
 
 type WorkerEventParams =
     | 'interval'
@@ -32,7 +44,7 @@ type WorkerEventParams =
     | 'stop'
     | 'queueRank';
 
-type TimingAction =
+export type TimingAction =
     | 'start'
     | 'stop'
     | 'updateInterval'
@@ -235,7 +247,7 @@ export class Transport {
     }
 
     public onMessage = (evt: WorkerEvent): void => {
-        const EVENTS: any = Transport.EVENTS;
+        const EVENTS = Transport.EVENTS;
         const evtName = evt.name || evt.data.action;
         switch (evtName) {
             case 'buffer':
@@ -255,10 +267,23 @@ export class Transport {
                 break;
             case 'processLoops':
                 this.events.emit(EVENTS.PROCESS_LOOPS, evt.data.payload);
-            default:
-                console.warn('Unhandled transport event: ', evt.name, evt);
+                break;
+            case 'updateBPM':
+                this.updateBPM(evt.data.payload.bpm); // TODO: gracefully handle missing payload/bpm
+                this.events.emit(EVENTS.UPDATE_BPM, evt.data.payload);
+                break;
+            case 'start':
+                this.start(evt.data.payload);
+                this.events.emit(EVENTS.START, evt.data.payload);
+                break;
+            case 'stop':
                 this.stop();
-            // Nothing
+                this.events.emit(EVENTS.STOP, evt.data.payload);
+                break;
+            default:
+                console.error('Unhandled transport event: ', evtName, evt);
+                this.stop(); // TODO: stop halting
+                break;
         }
     };
 
@@ -286,11 +311,11 @@ export class Transport {
             },
         );
 
-        this.start();
+        this.start({ bpm: this.bpm });
     }
 
-    public start() {
-        this.sendToWorker('start', { bpm: this.bpm });
+    public start({ bpm }) {
+        this.sendToWorker('start', { bpm });
     }
 
     public stop() {

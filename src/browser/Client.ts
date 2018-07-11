@@ -5,7 +5,7 @@ import {
     OSCPort,
 } from './typings';
 
-import { Transport, TransportActions } from './Transport';
+import { Transport, TransportActions, TimingAction } from './Transport';
 import { Loop } from './Loop';
 
 // Load as JS string for inline worker fallback
@@ -33,7 +33,7 @@ export class BrowserClient {
     private lastScheduledTickTimestamp: number = Date.now();
     // private tickInterval: number;
     private pendingTicks: Set<number> = new Set();
-    private hasStopped: boolean = false;
+    private hasStopped: boolean = true; // Initializes in a stopped state
     private transport: Transport;
     private bufferQueue: string[] = [];
     private newLoopsQueue: UnregisteredLoop[] = []; // TODO: remove any
@@ -72,19 +72,27 @@ export class BrowserClient {
         this.context = new AC();
     }
 
-    public sendToTransport(action: TransportActions, payload: any) {}
+    public sendToTransport(
+        action: TransportActions | TimingAction,
+        payload?: any,
+    ) {
+        // TODO: allow transport to observe messages from Client
+        this.transport.onMessage(<any>{ data: { action, payload } });
+    }
 
     public start(): void {
         if (!this.hasStopped) return; // already started, prevent double starts
         this.hasStopped = false;
+        this.startTimerWorker();
         this.sendToTransport('start', { bpm: this.bpm });
     }
 
     public stop(): void {
         if (this.hasStopped) return; // already stopped, prevent double stops
         this.hasStopped = true;
-        this.timerWorker.postMessage({ action: 'stop' });
-        this.timerWorker.terminate();
+        this.sendToTransport('stop');
+        // this.timerWorker.postMessage({ action: 'stop' });
+        // this.timerWorker.terminate();
     }
 
     // EVENT HANDLERS
@@ -93,10 +101,10 @@ export class BrowserClient {
     public onTick = (ev: Event): void => {
         const t = this.transport.getTick();
         console.log('tick', t);
-        // this.processLoops(t);
-        // if (t % Transport.DEFAULT_TICK_RESOLUTION === 0) {
-        //     this.onBeat();
-        // }
+        this.processLoops(t);
+        if (t % Transport.DEFAULT_TICK_RESOLUTION === 0) {
+            this.onBeat();
+        }
     };
 
     public onFirstBeat = (ev: Event): void => {
@@ -187,6 +195,8 @@ export class BrowserClient {
     }
 
     public processLoops(t: number) {
+        if (this.pendingTicks.has(t)) return;
+        this.pendingTicks.add(t);
         // TODO: Handle case of loop has already been called on this tick
 
         // Limit duration of this invokation with timeout to preserve time
@@ -272,7 +282,8 @@ export class BrowserClient {
     public startClock(): void {
         // Use web-worker for client-beat instead of backend worker
         if (!BrowserClient.USE_SERVER_CLOCK) {
-            this.startTimerWorker();
+            this.start();
+            // this.startTimerWorker();
         }
 
         this.startOSCListen();
