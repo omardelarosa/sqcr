@@ -109,9 +109,14 @@ export class BrowserClient {
         if (BrowserClient.DEBUG) {
             console.log('tick', t, since);
         }
-        this.processLoops(t);
-        if (t % Transport.DEFAULT_TICK_RESOLUTION === 0) {
-            this.onBeat();
+        if (!t) {
+            // TODO: handle undefined tick
+            console.warn('skipped tick');
+        } else {
+            this.processLoops(t);
+            if (t % Transport.DEFAULT_TICK_RESOLUTION === 0) {
+                this.onBeat();
+            }
         }
     };
 

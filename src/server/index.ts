@@ -239,7 +239,7 @@ export function startServer(opts: ServerInitOptions) {
 
     // Create an Express-based Web Socket server to which OSC messages will be relayed.
     const appResources = serverPath;
-    const nodeModules = path.join(__dirname, '..', '..', 'node_modules');
+    // const nodeModules = path.join(__dirname, '..', '..', 'node_modules');
     const libPath = path.join(__dirname, '..', '..', 'lib');
 
     const app = express();
@@ -250,11 +250,11 @@ export function startServer(opts: ServerInitOptions) {
 
     app.use(express.json()); // Support JSON post body
 
-    // static libs
-    app.use('/', express.static(appResources));
+    // static libs -- ignores index.html to avoid accidental rendering
+    app.use('/', express.static(appResources, { index: false }));
 
     // Serve node_modules for libs, etc
-    app.use('/node_modules/', express.static(nodeModules));
+    // app.use('/node_modules/', express.static(nodeModules));
 
     // Serve src for libs, etc
     app.use('/lib/', express.static(libPath));
