@@ -29,9 +29,11 @@ export class BrowserClient {
     public static DEBUG: boolean = false;
     public lastTick: number = Date.now();
     public timerWorker: Worker = null;
+    public clockHasStarted: boolean = false;
 
     private oscillator: OscillatorNode = null;
     private context: AudioContext;
+    private autoplay: boolean;
     private lastScheduledTickTimestamp: number = Date.now();
     private hasStopped: boolean = true; // Initializes in a stopped state
     private transport: Transport;
@@ -47,16 +49,17 @@ export class BrowserClient {
     private M: number = 4 * Transport.DEFAULT_TICK_RESOLUTION;
 
     constructor(options: IBrowserClientOptions = {}) {
-        const { useInlineWorker } = options;
+        const { useInlineWorker, autoplay = true } = options;
         this.useInlineWorker = !!useInlineWorker;
         // TODO: perhaps don't init on constructor?
+        this.autoplay = autoplay;
         this.init();
     }
 
     public init(): void {
         this.setTransport();
         this.setAudioContext();
-        this.startClock();
+        if (this.autoplay) this.startClock();
         this.setGlobals(<IWindow>window);
     }
 
@@ -224,6 +227,9 @@ export class BrowserClient {
             );
             return;
         }
+
+        // Use OSC layer to observe file changes
+
         // Init container
         let oscPort: OSCPort = new BrowserClient.OSC.WebSocketPort({
             url: `ws://${window.location.host}`,
@@ -250,6 +256,7 @@ export class BrowserClient {
                 new Worker(BrowserClient.TIMING_WORKER_PATH),
             );
         }
+        this.clockHasStarted = true;
     }
 
     public makeBlobWorker() {
@@ -260,21 +267,6 @@ export class BrowserClient {
         var blob = new Blob([TimingWorker], { type: 'text/javascript' });
 
         return new Worker(window.URL.createObjectURL(blob));
-    }
-
-    public setupMIDI(): void {
-        // if (!BrowserClient.MIDI) {
-        //     console.warn('No MIDI adaptor provided, MIDI support disabled.');
-        //     return;
-        // }
-        // // MIDI Testing
-        // BrowserClient.MIDI.enable(function(err) {
-        //     if (err) {
-        //         console.log('WebMidi could not be enabled.', err);
-        //     } else {
-        //         console.log('WebMidi enabled!');
-        //     }
-        // });
     }
 
     public getOutputs = (): any => {
@@ -299,7 +291,6 @@ export class BrowserClient {
         }
 
         this.startOSCListen();
-        this.setupMIDI();
     }
 
     // Sets window-level globals -- UH OH

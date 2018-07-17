@@ -114,6 +114,7 @@ interface ServerOptions {
     serverPath: string;
     port: number;
     rendererPath?: string;
+    locals: Record<string, string | number>;
 }
 
 type ConfigFile = Partial<ServerOptions>;
@@ -198,11 +199,13 @@ export function startServer(opts: ServerInitOptions) {
     const SERVER_PATH = path.resolve(config.serverPath || serverPath);
     const BUFFERS_LOCATION = path.join(SERVER_PATH, b);
     const USE_SERVER_CLOCK = useServerClock;
+    const CONFIG_BROWSER_LOCALS = config.locals || {};
 
     const options: ServerOptions = {
         port: config.port || port,
         serverPath: SERVER_PATH,
         libs: config.libs || DEFAULT_LIBS,
+        locals: config.locals || {},
     };
 
     console.log(ASCII_TEXT);
@@ -268,6 +271,7 @@ export function startServer(opts: ServerInitOptions) {
                     BUFFER_PATH: b,
                     USE_SERVER_CLOCK,
                     ASCII_TEXT,
+                    ...CONFIG_BROWSER_LOCALS, // Mixin user-provided local vars
                 },
                 libs,
                 renderer,

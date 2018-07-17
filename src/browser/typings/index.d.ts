@@ -43,6 +43,7 @@ export interface IMessage {
 export interface IBrowserClientOptions {
     bpm?: number;
     useInlineWorker?: boolean;
+    autoplay?: boolean;
 }
 
 export interface UnregisteredLoop {
