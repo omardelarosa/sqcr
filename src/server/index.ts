@@ -9,7 +9,6 @@ import defaultTemplate from '../templates/default.html';
 import { ASCII_TEXT } from '../templates/ascii';
 
 // Non-TS modules
-const osc = require('osc');
 const MidiClock = require('midi-clock');
 const watch = require('node-watch');
 const clc = require('cli-color');
@@ -21,6 +20,7 @@ const D_BEAT = debug('beat');
 const D_FILE = debug('file');
 const D_SERVER = debug('server');
 
+let osc;
 let clock;
 let clockIsRunning = false;
 let fileChangesHashMap = {};
@@ -70,6 +70,7 @@ const sendMIDITick = async socket => {
 };
 
 const readFileChanges = async socket => {
+    if (!osc) return;
     if (isEmpty(fileChangesHashMap)) return;
     const packets = [];
     for (let f in fileChangesHashMap) {
@@ -222,6 +223,7 @@ export function startServer(opts: ServerInitOptions) {
     let udpPort;
 
     if (IS_LIVE) {
+        osc = require('osc');
         // Bind to a UDP socket to listen for incoming OSC events.
         udpPort = new osc.UDPPort({
             localAddress: '0.0.0.0',
