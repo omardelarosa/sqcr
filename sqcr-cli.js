@@ -17,6 +17,7 @@ const cli = meow(
         --init, -i      init file name
         --clock, -sc    use server clock
         --config, -c    config file path
+        --live, -l      enable live mode
 `,
     {
         flags: {
@@ -47,6 +48,10 @@ const cli = meow(
             config: {
                 type: 'string',
                 alias: 'c',
+            },
+            live: {
+                type: 'boolean',
+                alias: 'l',
             },
         },
     },

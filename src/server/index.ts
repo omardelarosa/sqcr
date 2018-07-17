@@ -177,9 +177,10 @@ interface ServerInitOptions {
     serverPath?: string;
     currentDir?: string;
     buffers?: string;
-    init?: string; // Depricated
+    init?: string; // TODO: remove
     useServerClock: boolean;
     configPath: string;
+    isLive: boolean;
 }
 
 // Create an Express-based Web Socket server to which OSC messages will be relayed.
@@ -191,6 +192,7 @@ export function startServer(opts: ServerInitOptions) {
         buffers,
         useServerClock,
         configPath,
+        isLive,
     } = opts;
 
     const b = buffers || 'public/_buffers';
@@ -200,6 +202,7 @@ export function startServer(opts: ServerInitOptions) {
     const BUFFERS_LOCATION = path.join(SERVER_PATH, b);
     const USE_SERVER_CLOCK = useServerClock;
     const CONFIG_BROWSER_LOCALS = config.locals || {};
+    const IS_LIVE = isLive;
 
     const options: ServerOptions = {
         port: config.port || port,
@@ -216,29 +219,33 @@ export function startServer(opts: ServerInitOptions) {
 
     if (!serverPath) throw new Error('Invalid root path!');
 
-    // Bind to a UDP socket to listen for incoming OSC events.
-    const udpPort = new osc.UDPPort({
-        localAddress: '0.0.0.0',
-        localPort: 57121,
-    });
+    let udpPort;
 
-    udpPort.on('ready', () => {
-        var ipAddresses = getIPAddresses();
-        const msgParts = ['OSC over UDP host: '];
-        ipAddresses.forEach(address => {
-            msgParts.push(
-                clc.cyanBright(address + ':' + udpPort.options.localPort),
-            );
+    if (IS_LIVE) {
+        // Bind to a UDP socket to listen for incoming OSC events.
+        udpPort = new osc.UDPPort({
+            localAddress: '0.0.0.0',
+            localPort: 57121,
         });
-        console.log(...msgParts);
-        console.log(
-            'browser host: ',
-            clc.cyanBright(`http://localhost:${port}`),
-        );
-        console.log('loops path: ', clc.cyanBright(`${buffers}`));
-    });
 
-    udpPort.open();
+        udpPort.on('ready', () => {
+            var ipAddresses = getIPAddresses();
+            const msgParts = ['OSC over UDP host: '];
+            ipAddresses.forEach(address => {
+                msgParts.push(
+                    clc.cyanBright(address + ':' + udpPort.options.localPort),
+                );
+            });
+            console.log(...msgParts);
+            console.log(
+                'browser host: ',
+                clc.cyanBright(`http://localhost:${port}`),
+            );
+            console.log('loops path: ', clc.cyanBright(`${buffers}`));
+        });
+
+        udpPort.open();
+    }
 
     // Create an Express-based Web Socket server to which OSC messages will be relayed.
     const appResources = serverPath;
@@ -247,9 +254,14 @@ export function startServer(opts: ServerInitOptions) {
 
     const app = express();
     const server = app.listen(port);
-    const wss = new WebSocket.Server({
-        server: server,
-    });
+
+    let wss;
+
+    if (IS_LIVE) {
+        wss = new WebSocket.Server({
+            server: server,
+        });
+    }
 
     app.use(express.json()); // Support JSON post body
 
@@ -296,43 +308,52 @@ export function startServer(opts: ServerInitOptions) {
         res.send({ status: 'success' });
     });
 
-    wss.on('connection', socket => {
-        D_SERVER('A browser client has connected via WebSockets!');
-        var socketPort = new osc.WebSocketPort({
-            socket: socket,
-        });
+    if (IS_LIVE) {
+        wss.on('connection', socket => {
+            if (!IS_LIVE) return;
+            D_SERVER('A browser client has connected via WebSockets!');
+            var socketPort = new osc.WebSocketPort({
+                socket: socket,
+            });
 
-        var relay = new osc.Relay(udpPort, socketPort, {
-            raw: true,
-        });
+            var relay = new osc.Relay(udpPort, socketPort, {
+                raw: true,
+            });
 
-        startClock(clock);
+            startClock(clock);
 
-        const beatCallback = position => {
-            const microPos = position % 24; // 24 ticks per event
-            if (USE_SERVER_CLOCK) {
-                sendMIDITick(socketPort).catch(e => unbindCallback());
-            }
-            if (microPos === 0) {
-                // TODO: better handle closing of browser tabs
+            const beatCallback = position => {
+                const microPos = position % 24; // 24 ticks per event
                 if (USE_SERVER_CLOCK) {
-                    D_BEAT('Beat: %d', position / 24);
-                    sendMIDIBeat(socketPort).catch(e => unbindCallback());
+                    sendMIDITick(socketPort).catch(e => unbindCallback());
                 }
-                readFileChanges(socketPort).catch(e => unbindCallback());
-            }
-        };
+                if (microPos === 0) {
+                    // TODO: better handle closing of browser tabs
+                    if (USE_SERVER_CLOCK) {
+                        D_BEAT('Beat: %d', position / 24);
+                        sendMIDIBeat(socketPort).catch(e => unbindCallback());
+                    }
+                    readFileChanges(socketPort).catch(e => unbindCallback());
+                }
+            };
 
-        const unbindCallback = () => {
-            clock.removeListener('position', beatCallback);
-        };
+            const unbindCallback = () => {
+                clock.removeListener('position', beatCallback);
+            };
 
-        clock.on('position', beatCallback);
-    });
+            clock.on('position', beatCallback);
+        });
 
-    watch(`${BUFFERS_LOCATION}`, { recursive: false }, (evt, name) => {
-        const bufferName = name.replace(options.serverPath, '');
-        D_FILE('%s changed.', bufferName);
-        fileChangesHashMap[bufferName] = true;
-    });
+        watch(`${BUFFERS_LOCATION}`, { recursive: false }, (evt, name) => {
+            const bufferName = name.replace(options.serverPath, '');
+            D_FILE('%s changed.', bufferName);
+            fileChangesHashMap[bufferName] = true;
+        });
+    } else {
+        console.log(
+            'browser host: ',
+            clc.cyanBright(`http://localhost:${port}`),
+        );
+        console.log('loops path: ', clc.cyanBright(`${buffers}`));
+    }
 }

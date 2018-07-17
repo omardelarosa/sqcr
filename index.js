@@ -7,6 +7,7 @@ const SQCR = (input, flags) => {
     const currentDir = __dirname;
     const port = flags.port;
     const buffers = input[0] || flags.buffers;
+    const isLive = flags.live === undefined ? true : !!flags.live;
     const configPath = flags.config
         ? path.join(process.cwd(), flags.config)
         : '';
@@ -20,6 +21,7 @@ const SQCR = (input, flags) => {
         init: initFileName,
         useServerClock,
         configPath,
+        isLive,
     });
 };
 
